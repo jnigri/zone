@@ -63,7 +63,7 @@ final class MusicPlayer {
     @ObservationIgnored private let node = AVAudioPlayerNode()
     @ObservationIgnored private let modulator = FocusModulatorUnit.makeNode()
     @ObservationIgnored private var connectedFormat: AVAudioFormat?
-    @ObservationIgnored private var file: AVAudioFile?
+    @ObservationIgnored private var stream: TrackStream?
 
     // Position is tracked by wall clock so it survives engine restarts (device changes).
     @ObservationIgnored private var positionBase: TimeInterval = 0
@@ -71,7 +71,9 @@ final class MusicPlayer {
 
     @ObservationIgnored private var queue: [URL] = []
     @ObservationIgnored private var history: [URL] = []
+    @ObservationIgnored private var loadGeneration = 0
     @ObservationIgnored private var scheduleGeneration = 0
+    @ObservationIgnored private var queuedBuffers = 0
     @ObservationIgnored private var fadeGeneration = 0
     @ObservationIgnored private var fadeTimer: Timer?
 
@@ -83,10 +85,7 @@ final class MusicPlayer {
         return min(trackDuration, positionBase + elapsed)
     }
 
-    var trackDuration: TimeInterval {
-        guard let file else { return 0 }
-        return Double(file.length) / file.processingFormat.sampleRate
-    }
+    var trackDuration: TimeInterval { stream?.duration ?? 0 }
 
     init() {
         let defaults = UserDefaults.standard
@@ -117,11 +116,12 @@ final class MusicPlayer {
     func play() {
         cancelFade()
         isPlaying = true
-        if file != nil {
+        if stream != nil {
             startNode()
-        } else {
+        } else if current == nil {
             advance()
         }
+        // Otherwise a track is still opening; it starts once loaded.
         onChange?()
     }
 
@@ -135,10 +135,11 @@ final class MusicPlayer {
     func stop() {
         cancelFade()
         isPlaying = false
+        loadGeneration += 1
         scheduleGeneration += 1
         node.stop()
         engine.stop()
-        file = nil
+        stream = nil
         current = nil
         positionBase = 0
         resumedAt = nil
@@ -151,7 +152,7 @@ final class MusicPlayer {
 
     /// Restarts the current track if it has played for more than 3s, otherwise goes back one.
     func previous() {
-        if file != nil, currentTime > 3 {
+        if stream != nil, currentTime > 3 {
             restartTrack()
             return
         }
@@ -164,7 +165,7 @@ final class MusicPlayer {
     }
 
     func fadeOut(over seconds: TimeInterval, then completion: @escaping () -> Void) {
-        guard file != nil, isPlaying else { return completion() }
+        guard stream != nil, isPlaying else { return completion() }
         cancelFade()
         let generation = fadeGeneration
         let startVolume = node.volume
@@ -197,52 +198,72 @@ final class MusicPlayer {
         load(queue.removeFirst())
     }
 
+    /// Opening a track is async; a newer load or a stop supersedes a pending one.
     private func load(_ url: URL) {
-        do {
-            let file = try AVAudioFile(forReading: url)
-            node.stop()
-            connect(format: file.processingFormat)
-            self.file = file
-            current = url
-            schedule(from: 0)
-            if isPlaying { startNode() }
-            onChange?()
-        } catch {
-            // Unreadable file: drop it and move on.
-            tracks.removeAll { $0 == url }
-            if !tracks.isEmpty { advance() }
+        loadGeneration += 1
+        let generation = loadGeneration
+        scheduleGeneration += 1
+        node.stop()
+        stream = nil
+        current = url
+        positionBase = 0
+        resumedAt = nil
+
+        Task { @MainActor [weak self] in
+            do {
+                let stream = try await TrackStream.open(url)
+                guard let self, self.loadGeneration == generation else { return }
+                self.connect(format: stream.format)
+                self.stream = stream
+                self.schedule(from: 0)
+                if self.isPlaying { self.startNode() }
+                self.onChange?()
+            } catch {
+                // Unreadable file: drop it and move on.
+                guard let self, self.loadGeneration == generation else { return }
+                self.tracks.removeAll { $0 == url }
+                self.current = nil
+                if !self.tracks.isEmpty { self.advance() }
+            }
         }
     }
 
     private func restartTrack() {
-        guard file != nil else { return }
+        guard stream != nil else { return }
         schedule(from: 0)
         if isPlaying { startNode() }
         onChange?()
     }
 
-    /// Queues the current file from `seconds` onward. Stopping the node fires the previous
-    /// segment's completion too, so completions carry a generation and stale ones are ignored.
+    /// Plays the current track from `seconds` onward, keeping a few decoded chunks queued
+    /// (~1.4 s). Stopping the node fires pending completions too, so completions carry a
+    /// generation and stale ones are ignored.
     private func schedule(from seconds: TimeInterval) {
-        guard let file else { return }
+        guard let stream else { return }
         scheduleGeneration += 1
         let generation = scheduleGeneration
         node.stop()
         positionBase = seconds
         resumedAt = nil
+        queuedBuffers = 0
 
-        let startFrame = AVAudioFramePosition(seconds * file.processingFormat.sampleRate)
-        guard startFrame < file.length else { return }
-        node.scheduleSegment(
-            file,
-            startingFrame: startFrame,
-            frameCount: AVAudioFrameCount(file.length - startFrame),
-            at: nil,
-            completionCallbackType: .dataPlayedBack
-        ) { [weak self] _ in
+        do { try stream.seek(to: seconds) } catch { return }
+        for _ in 0..<4 { scheduleNextBuffer(generation: generation) }
+    }
+
+    private func scheduleNextBuffer(generation: Int) {
+        guard let stream, generation == scheduleGeneration else { return }
+        guard let buffer = stream.nextBuffer() else {
+            // Decoder is done; the track ends once the last queued chunk has played.
+            if queuedBuffers == 0, isPlaying { advance() }
+            return
+        }
+        queuedBuffers += 1
+        node.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
             DispatchQueue.main.async {
-                guard let self, self.scheduleGeneration == generation, self.isPlaying else { return }
-                self.advance()
+                guard let self, self.scheduleGeneration == generation else { return }
+                self.queuedBuffers -= 1
+                self.scheduleNextBuffer(generation: generation)
             }
         }
     }
@@ -281,7 +302,7 @@ final class MusicPlayer {
 
     /// Output device changed (headphones, AirPods…): the engine stopped, so resume where we were.
     private func handleConfigurationChange() {
-        guard file != nil else { return }
+        guard stream != nil else { return }
         let position = currentTime
         schedule(from: position)
         if isPlaying { startNode() }
