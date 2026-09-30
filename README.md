@@ -21,4 +21,4 @@ Requires macOS 15+ and a Swift 6 toolchain (Command Line Tools are enough).
 - Focus modulation (Settings, off by default): pulses the 200 Hz–1 kHz band of your music at 16 Hz, the
   technique Brain.fm uses ([Woods et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11499863/)).
   Subtle / Medium / Strong set how deep the pulse dips.
-- Settings (⌘,): menu bar mode (hides Dock icon, panel under status icon), theme System/Dark/Light.
+- Settings (gear or ⌘,, opens in place; back arrow or Escape returns): menu bar mode (hides Dock icon, panel under status icon), theme System/Dark/Light.

@@ -44,12 +44,6 @@ struct ZoneApp: App {
             MenuBarLabel(timer: state.timer)
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView()
-                .environment(state)
-                .themed()
-        }
     }
 }
 

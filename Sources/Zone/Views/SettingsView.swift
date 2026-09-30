@@ -1,6 +1,9 @@
 import SwiftUI
 
+/// Settings screen shown in place of the session view (window and menu bar panel).
 struct SettingsView: View {
+    let onBack: () -> Void
+
     @Environment(AppState.self) private var state
     @Environment(\.palette) private var palette
     @Environment(\.openWindow) private var openWindow
@@ -11,63 +14,106 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var music = state.music
 
-        Form {
-            Section {
-                Toggle("Show in menu bar", isOn: $showInMenuBar)
-                Text("Zone lives next to the clock and hides its Dock icon.")
-                    .font(.caption)
-                    .foregroundStyle(palette.muted)
+        VStack(alignment: .leading, spacing: 14) {
+            header
+
+            card {
+                Toggle("Show in menu bar", isOn: menuBarBinding)
+                caption("Zone lives next to the clock and hides its Dock icon.")
             }
 
-            Section {
-                Picker("Theme", selection: $theme) {
-                    ForEach(ThemeMode.allCases) { Text($0.title).tag($0) }
+            card {
+                row("Theme") {
+                    Picker("Theme", selection: $theme) {
+                        ForEach(ThemeMode.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
             }
 
-            Section("Focus") {
+            card {
                 Toggle("Focus modulation (16 Hz)", isOn: $music.focusModulation)
                 Picker("Intensity", selection: $music.modulationDepth) {
                     ForEach(ModulationDepth.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .disabled(!music.focusModulation)
-                Text("Pulses the mid frequencies of your music 16 times a second, the technique Brain.fm uses. Research shows the most benefit for people with attention difficulties.")
-                    .font(.caption)
-                    .foregroundStyle(palette.muted)
+                caption("Pulses the mid frequencies 16 times a second, the technique Brain.fm uses. Research shows the most benefit for people with attention difficulties.")
             }
 
-            Section("Music") {
-                LabeledContent("Folder") {
-                    Text(state.folder.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                        .lineLimit(1)
-                        .truncationMode(.head)
+            card {
+                row("Music") {
+                    Text("\(music.tracks.count) tracks")
                         .foregroundStyle(palette.muted)
                 }
+                Text(state.folder.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    .font(.callout)
+                    .foregroundStyle(palette.muted)
+                    .lineLimit(1)
+                    .truncationMode(.head)
                 HStack {
-                    Text("\(state.music.tracks.count) tracks")
-                        .foregroundStyle(palette.muted)
-                    Spacer()
                     Button("Rescan") { state.rescanFolder() }
                     Button("Choose…") { state.chooseFolder() }
                 }
+                .controlSize(.small)
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background(palette.background)
-        .frame(width: 420)
-        .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: showInMenuBar) { _, menuBar in
-            AppMode.applyActivationPolicy(menuBar: menuBar)
-            if menuBar {
-                dismissWindow(id: AppMode.mainWindowID)
-            } else {
-                openWindow(id: AppMode.mainWindowID)
-            }
-            NSApp.activate()
-        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .onExitCommand(perform: onBack)
         .onChange(of: theme) { _, mode in mode.apply() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 6) {
+            IconButton(systemName: "chevron.left", help: "Back") { onBack() }
+            Text("Settings")
+                .font(.system(.headline, design: .rounded))
+            Spacer()
+        }
+        .padding(.leading, -8)
+    }
+
+    /// Side effects run in the setter: turning menu bar mode off from the menu bar
+    /// panel removes this view, so an onChange here might never fire.
+    private var menuBarBinding: Binding<Bool> {
+        Binding(
+            get: { showInMenuBar },
+            set: { menuBar in
+                showInMenuBar = menuBar
+                AppMode.applyActivationPolicy(menuBar: menuBar)
+                if menuBar {
+                    dismissWindow(id: AppMode.mainWindowID)
+                } else {
+                    openWindow(id: AppMode.mainWindowID)
+                }
+                NSApp.activate()
+            }
+        )
+    }
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8, content: content)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(palette.panel, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func row<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            trailing()
+        }
+    }
+
+    private func caption(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(palette.muted)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

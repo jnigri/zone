@@ -1,19 +1,26 @@
 import SwiftUI
 
-/// Shared by the main window and the menu bar panel.
+/// Shared by the main window and the menu bar panel. Settings replace the
+/// session view in place; the back arrow (or Escape) returns.
 struct MainView: View {
     @Environment(AppState.self) private var state
     @Environment(\.palette) private var palette
-    @Environment(\.openSettings) private var openSettings
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
+    @State private var showingSettings = false
 
     var body: some View {
-        VStack(spacing: 20) {
-            header
-            TimerRing(timer: state.timer)
-            DurationPicker()
-            TransportBar()
-            trackInfo
+        Group {
+            if showingSettings {
+                SettingsView { showingSettings = false }
+            } else {
+                VStack(spacing: 20) {
+                    header
+                    TimerRing(timer: state.timer)
+                    DurationPicker()
+                    TransportBar()
+                    trackInfo
+                }
+            }
         }
         .padding(20)
         .frame(width: 320)
@@ -31,9 +38,9 @@ struct MainView: View {
                 .font(.system(.headline, design: .rounded))
             Spacer()
             IconButton(systemName: "gearshape", help: "Settings") {
-                NSApp.activate()
-                openSettings()
+                showingSettings = true
             }
+            .keyboardShortcut(",", modifiers: .command)
             if showInMenuBar {
                 IconButton(systemName: "power", help: "Quit Zone") {
                     NSApp.terminate(nil)
