@@ -11,6 +11,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Zone"
 cp Info.plist "$APP/Contents/Info.plist"
+cp Resources/Logo.png "$APP/Contents/Resources/Logo.png"
 
 ICONSET="$(mktemp -d)/AppIcon.iconset"
 "$BIN" --render-icon Resources/Logo.png "$ICONSET"

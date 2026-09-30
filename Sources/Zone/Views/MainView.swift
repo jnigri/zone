@@ -24,9 +24,9 @@ struct MainView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            HeadsetShape(weight: 60)
-                .fill(palette.accent)
-                .frame(width: 24, height: 20)
+            Image(nsImage: Logo.templateImage)
+                .renderingMode(.template)
+                .foregroundStyle(palette.accent)
             Text("Zone")
                 .font(.system(.headline, design: .rounded))
             Spacer()

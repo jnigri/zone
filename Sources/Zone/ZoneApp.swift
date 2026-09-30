@@ -13,7 +13,7 @@ struct ZoneApp: App {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-icon"), i + 2 < args.count {
             do {
-                try HeadsetGlyph.renderIconSet(
+                try Logo.renderIconSet(
                     logo: URL(fileURLWithPath: args[i + 1]),
                     to: URL(fileURLWithPath: args[i + 2])
                 )
@@ -58,7 +58,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(nsImage: HeadsetGlyph.templateImage)
+            Image(nsImage: Logo.templateImage)
             if timer.phase == .running || timer.phase == .paused {
                 Text(timer.remaining.compactString)
                     .monospacedDigit()
