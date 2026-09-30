@@ -83,10 +83,13 @@ extension TimeInterval {
     }
 
     /// Compact form for the menu bar: minutes left rounded to nearest, halves down
-    /// ("15m" for 14:31, "14m" for 14:30), or "45s" in the last minute.
+    /// ("15m" for 14:31, "14m" for 14:30), "h:mm" past 90 minutes ("2:05"),
+    /// or "45s" in the last minute.
     var compactString: String {
         let total = Int(self.rounded(.up))
-        return total >= 60 ? "\((total + 29) / 60)m" : "\(total)s"
+        guard total >= 60 else { return "\(total)s" }
+        let minutes = (total + 29) / 60
+        return minutes > 90 ? String(format: "%d:%02d", minutes / 60, minutes % 60) : "\(minutes)m"
     }
 
     /// Human duration label: "15m", "1h", "1h 20m", "45s", "2m 30s".
