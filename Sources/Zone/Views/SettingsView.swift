@@ -39,7 +39,7 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .disabled(!music.focusModulation)
-                caption("Pulses the mid frequencies 16 times a second, the technique Brain.fm uses. Research shows the most benefit for people with attention difficulties.")
+                caption("Gently pulses the mid-range of your music 16 times a second. Brain activity tends to sync with this rhythm, which is linked to sustained attention, helping you stay on task. Helps most if focusing is usually hard for you.")
             }
 
             card {

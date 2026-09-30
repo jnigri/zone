@@ -1,7 +1,7 @@
 import AudioToolbox
 import Foundation
 
-/// Brain.fm-style focus modulation (Woods et al. 2024): the 200 Hz–1 kHz band of the
+/// Focus modulation (Woods et al. 2024, Communications Biology): the 200 Hz–1 kHz band of the
 /// mix dips in loudness 16 times a second, following a sine; the rest passes untouched.
 ///
 /// out = x − g(t) · bandpass(x), with g(t) = depth · (0.5 − 0.5·cos(2π·16·t)).
