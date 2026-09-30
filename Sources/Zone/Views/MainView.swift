@@ -7,6 +7,7 @@ struct MainView: View {
     @Environment(\.palette) private var palette
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
     @State private var showingSettings = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
@@ -27,6 +28,7 @@ struct MainView: View {
         .foregroundStyle(palette.text)
         .background(palette.background)
         .containerBackground(palette.background, for: .window)
+        .onAppear { AppMode.openWindow = openWindow }
     }
 
     private var header: some View {

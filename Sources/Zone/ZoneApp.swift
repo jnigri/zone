@@ -50,6 +50,8 @@ struct ZoneApp: App {
 struct MenuBarLabel: View {
     let timer: SessionTimer
 
+    @Environment(\.openWindow) private var openWindow
+
     var body: some View {
         HStack(spacing: 4) {
             Image(nsImage: Logo.templateImage)
@@ -59,19 +61,53 @@ struct MenuBarLabel: View {
                     .monospacedDigit()
             }
         }
+        .onAppear { AppMode.openWindow = openWindow }
     }
 }
 
 enum AppMode {
     static let mainWindowID = "main"
 
+    /// Captured from live views so the main window can be reopened from app-level code.
+    static var openWindow: OpenWindowAction?
+
     /// Menu bar mode hides the Dock icon; window mode shows it.
     static func applyActivationPolicy(menuBar: Bool) {
         NSApp.setActivationPolicy(menuBar ? .accessory : .regular)
     }
+
+    /// Driven by the stored setting (see AppDelegate), not by the toggle's view:
+    /// the toggle lives inside the very window/panel this closes.
+    static func switchTo(menuBar: Bool) {
+        applyActivationPolicy(menuBar: menuBar)
+        if menuBar {
+            mainWindow?.close()
+        } else {
+            if let window = mainWindow {
+                window.makeKeyAndOrderFront(nil)
+            } else {
+                openWindow?(id: mainWindowID)
+            }
+            NSApp.activate()
+        }
+    }
+
+    private static var mainWindow: NSWindow? {
+        NSApp.windows.first { window in
+            guard let id = window.identifier?.rawValue else { return false }
+            return id == mainWindowID || id.hasPrefix(mainWindowID + "-")
+        }
+    }
+}
+
+extension UserDefaults {
+    /// KVO-observable mirror of the showInMenuBar key (name must match the key).
+    @objc dynamic var showInMenuBar: Bool { bool(forKey: Keys.showInMenuBar) }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    private var menuBarObservation: NSKeyValueObservation?
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppMode.applyActivationPolicy(menuBar: UserDefaults.standard.bool(forKey: Keys.showInMenuBar))
     }
@@ -82,6 +118,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             UNUserNotificationCenter.current().delegate = self
         }
         Notifier.requestAuthorization()
+
+        menuBarObservation = UserDefaults.standard.observe(\.showInMenuBar, options: [.old, .new]) { _, change in
+            guard let menuBar = change.newValue, menuBar != change.oldValue else { return }
+            // Next run loop turn: let SwiftUI finish updating the toggle and scenes first.
+            DispatchQueue.main.async { AppMode.switchTo(menuBar: menuBar) }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -6,8 +6,6 @@ struct SettingsView: View {
 
     @Environment(AppState.self) private var state
     @Environment(\.palette) private var palette
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
     @AppStorage(Keys.theme) private var theme: ThemeMode = .system
 
@@ -18,7 +16,7 @@ struct SettingsView: View {
             header
 
             card {
-                Toggle("Show in menu bar", isOn: menuBarBinding)
+                Toggle("Show in menu bar", isOn: $showInMenuBar)
                 caption("Zone lives next to the clock and hides its Dock icon.")
             }
 
@@ -75,24 +73,6 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(.leading, -8)
-    }
-
-    /// Side effects run in the setter: turning menu bar mode off from the menu bar
-    /// panel removes this view, so an onChange here might never fire.
-    private var menuBarBinding: Binding<Bool> {
-        Binding(
-            get: { showInMenuBar },
-            set: { menuBar in
-                showInMenuBar = menuBar
-                AppMode.applyActivationPolicy(menuBar: menuBar)
-                if menuBar {
-                    dismissWindow(id: AppMode.mainWindowID)
-                } else {
-                    openWindow(id: AppMode.mainWindowID)
-                }
-                NSApp.activate()
-            }
-        )
     }
 
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
