@@ -3,6 +3,7 @@ import Foundation
 /// Parses loose human durations: "30", "12m", "39min", "120s", "12 secs",
 /// "1h", "1h 40m", "1h40", "1.5h", "2 hours and 5 minutes".
 /// A bare number means minutes; a bare number after hours means minutes too.
+/// "∞", "inf" or "infinite" mean an open-ended session.
 enum DurationParser {
     static let maximum: TimeInterval = 24 * 3600
 
@@ -10,6 +11,7 @@ enum DurationParser {
 
     static func parse(_ input: String) -> TimeInterval? {
         let text = input.lowercased().trimmingCharacters(in: .whitespaces)
+        if ["∞", "inf", "infinite", "infinity"].contains(text) { return .infinity }
         let range = NSRange(text.startIndex..., in: text)
         let matches = token.matches(in: text, range: range)
         guard !matches.isEmpty else { return nil }

@@ -12,8 +12,9 @@ final class AppState {
     @ObservationIgnored private var nowPlaying: NowPlaying?
 
     init() {
+        // Stored as seconds; -1 means open-ended (property lists can't hold infinity).
         let stored = UserDefaults.standard.double(forKey: Keys.duration)
-        timer = SessionTimer(duration: stored > 0 ? stored : 30 * 60)
+        timer = SessionTimer(duration: stored == -1 ? SessionTimer.infinite : stored > 0 ? stored : 30 * 60)
         folder = MusicLibrary.folder()
         music.reload(folder: folder)
         timer.onFinish = { [weak self] in self?.finishSession() }
@@ -46,7 +47,7 @@ final class AppState {
         let restart = isActive
         if restart { timer.reset() }
         timer.setDuration(value)
-        UserDefaults.standard.set(timer.duration, forKey: Keys.duration)
+        UserDefaults.standard.set(timer.isInfinite ? -1 : timer.duration, forKey: Keys.duration)
         if restart {
             timer.start()
             music.play()

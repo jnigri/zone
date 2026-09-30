@@ -15,10 +15,10 @@ struct TimerRing: View {
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.25), value: timer.progress)
             VStack(spacing: 4) {
-                Text(timer.remaining.clockString)
+                Text(timer.displayTime.clockString(countingUp: timer.isInfinite))
                     .font(.system(size: 44, weight: .light, design: .rounded))
                     .monospacedDigit()
-                    .contentTransition(.numericText(countsDown: true))
+                    .contentTransition(.numericText(countsDown: !timer.isInfinite))
                 Text(status)
                     .font(.caption)
                     .textCase(.uppercase)

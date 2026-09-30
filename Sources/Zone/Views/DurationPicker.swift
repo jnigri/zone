@@ -3,15 +3,21 @@ import SwiftUI
 struct DurationPicker: View {
     @Environment(AppState.self) private var state
 
-    private var isCustom: Bool { !AppState.presets.contains(state.timer.duration) }
+    private var isCustom: Bool {
+        !state.timer.isInfinite && !AppState.presets.contains(state.timer.duration)
+    }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(AppState.presets, id: \.self) { preset in
                 Chip(title: preset.durationLabel, selected: state.timer.duration == preset) {
                     state.setDuration(preset)
                 }
             }
+            Chip(title: "∞", selected: state.timer.isInfinite) {
+                state.setDuration(SessionTimer.infinite)
+            }
+            .help("Open-ended: counts up instead of down")
             CustomChip(
                 title: isCustom ? state.timer.duration.durationLabel : "Custom",
                 selected: isCustom,
@@ -44,9 +50,9 @@ private struct ChipLabel<Content: View>: View {
     var body: some View {
         content
             .font(.system(.callout, design: .rounded, weight: .medium))
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .frame(minWidth: 48)
+            .frame(minWidth: 44)
             .background(selected ? palette.raised : palette.panel, in: Capsule())
             .overlay(Capsule().strokeBorder(border, lineWidth: 1))
             .foregroundStyle(selected ? palette.text : palette.muted)
@@ -92,7 +98,7 @@ private struct CustomChip: View {
             }
         } else {
             Chip(title: title, selected: selected) {
-                text = current.durationLabel
+                text = current.isFinite ? current.durationLabel : ""
                 editing = true
             }
         }

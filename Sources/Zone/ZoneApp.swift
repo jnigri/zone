@@ -57,7 +57,7 @@ struct MenuBarLabel: View {
             Image(nsImage: Logo.templateImage)
             if timer.phase == .running || timer.phase == .paused {
                 // Leading space: the menu bar ignores HStack spacing between icon and title.
-                Text(" " + timer.remaining.compactString)
+                Text(" " + timer.displayTime.compactString(countingUp: timer.isInfinite))
                     .monospacedDigit()
             }
         }
