@@ -26,6 +26,12 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
     @ObservationIgnored private var history: [URL] = []
     @ObservationIgnored private var fadeGeneration = 0
 
+    /// Fired after playback state, track or position changes (used for Now Playing).
+    @ObservationIgnored var onChange: (() -> Void)?
+
+    var currentTime: TimeInterval { player?.currentTime ?? 0 }
+    var trackDuration: TimeInterval { player?.duration ?? 0 }
+
     override init() {
         let defaults = UserDefaults.standard
         volume = defaults.object(forKey: Keys.volume) as? Double ?? 0.6
@@ -51,12 +57,14 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
         } else {
             advance()
         }
+        onChange?()
     }
 
     func pause() {
         fadeGeneration += 1
         isPlaying = false
         player?.pause()
+        onChange?()
     }
 
     func stop() {
@@ -65,6 +73,7 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
         player?.stop()
         player = nil
         current = nil
+        onChange?()
     }
 
     func next() {
@@ -75,10 +84,12 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
     func previous() {
         if let player, player.currentTime > 3 {
             player.currentTime = 0
+            onChange?()
             return
         }
         guard let previous = history.popLast() else {
             player?.currentTime = 0
+            onChange?()
             return
         }
         if let current { queue.insert(current, at: 0) }
@@ -118,6 +129,7 @@ final class MusicPlayer: NSObject, AVAudioPlayerDelegate {
             player.prepareToPlay()
             self.player = player
             if isPlaying { player.play() }
+            onChange?()
         } catch {
             // Unreadable file: drop it and move on.
             tracks.removeAll { $0 == url }

@@ -9,6 +9,7 @@ final class AppState {
     let timer: SessionTimer
     let music = MusicPlayer()
     private(set) var folder: URL
+    @ObservationIgnored private var nowPlaying: NowPlaying?
 
     init() {
         let stored = UserDefaults.standard.double(forKey: Keys.duration)
@@ -16,6 +17,8 @@ final class AppState {
         folder = MusicLibrary.folder()
         music.reload(folder: folder)
         timer.onFinish = { [weak self] in self?.finishSession() }
+        nowPlaying = NowPlaying(state: self)
+        music.onChange = { [weak self] in self?.syncNowPlaying() }
     }
 
     var isActive: Bool { timer.phase == .running || timer.phase == .paused }
@@ -29,11 +32,13 @@ final class AppState {
             timer.start()
             music.play()
         }
+        syncNowPlaying()
     }
 
     func stop() {
         timer.reset()
         music.stop()
+        syncNowPlaying()
     }
 
     /// Picking a duration mid-session restarts the session with it; music keeps its track.
@@ -46,6 +51,7 @@ final class AppState {
             timer.start()
             music.play()
         }
+        syncNowPlaying()
     }
 
     func chooseFolder() {
@@ -70,6 +76,11 @@ final class AppState {
         music.fadeOut(over: 3) { [weak self] in self?.music.stop() }
         NSSound(named: "Glass")?.play()
         Notifier.sessionDone(duration: timer.duration)
+        syncNowPlaying()
+    }
+
+    private func syncNowPlaying() {
+        nowPlaying?.update(from: self)
     }
 }
 
