@@ -54,7 +54,8 @@ struct MenuBarLabel: View {
         HStack(spacing: 4) {
             Image(nsImage: Logo.templateImage)
             if timer.phase == .running || timer.phase == .paused {
-                Text(timer.remaining.compactString)
+                // Leading space: the menu bar ignores HStack spacing between icon and title.
+                Text(" " + timer.remaining.compactString)
                     .monospacedDigit()
             }
         }
