@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage(Keys.theme) private var theme: ThemeMode = .system
 
     var body: some View {
+        @Bindable var music = state.music
+
         Form {
             Section {
                 Toggle("Show in menu bar", isOn: $showInMenuBar)
@@ -22,6 +24,18 @@ struct SettingsView: View {
                     ForEach(ThemeMode.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+            }
+
+            Section("Focus") {
+                Toggle("Focus modulation (16 Hz)", isOn: $music.focusModulation)
+                Picker("Intensity", selection: $music.modulationDepth) {
+                    ForEach(ModulationDepth.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .disabled(!music.focusModulation)
+                Text("Pulses the mid frequencies of your music 16 times a second, the technique Brain.fm uses. Research shows the most benefit for people with attention difficulties.")
+                    .font(.caption)
+                    .foregroundStyle(palette.muted)
             }
 
             Section("Music") {

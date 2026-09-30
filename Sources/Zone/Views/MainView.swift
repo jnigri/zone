@@ -55,7 +55,8 @@ struct MainView: View {
             .font(.callout)
         } else {
             Label(
-                state.music.current?.deletingPathExtension().lastPathComponent ?? "\(state.music.tracks.count) tracks ready",
+                (state.music.current?.deletingPathExtension().lastPathComponent ?? "\(state.music.tracks.count) tracks ready")
+                    + (state.music.focusModulation ? " · 16 Hz" : ""),
                 systemImage: "music.note"
             )
             .font(.callout)
