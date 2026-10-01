@@ -33,11 +33,6 @@ struct MainView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(nsImage: Logo.templateImage)
-                .renderingMode(.template)
-                .foregroundStyle(palette.accent)
-            Text("Zone")
-                .font(.system(.headline, design: .rounded))
             Spacer()
             IconButton(systemName: "gearshape", help: "Settings") {
                 showingSettings = true
