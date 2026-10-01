@@ -28,6 +28,13 @@ enum ModulationDepth: String, CaseIterable, Identifiable {
 @Observable
 final class MusicPlayer {
     private(set) var tracks: [URL] = []
+    /// Tags per track, read from the files after each reload.
+    private(set) var trackTags: [URL: [String]] = [:]
+    /// Tags switched off in the filter: songs having any of them are skipped. Storing the
+    /// "off" set means tags added later start on.
+    private(set) var skippedTags: Set<String> {
+        didSet { UserDefaults.standard.set(skippedTags.sorted(), forKey: Keys.skippedTags) }
+    }
     private(set) var current: URL?
     private(set) var isPlaying = false
 
@@ -72,6 +79,7 @@ final class MusicPlayer {
     @ObservationIgnored private var queue: [URL] = []
     @ObservationIgnored private var history: [URL] = []
     @ObservationIgnored private var loadGeneration = 0
+    @ObservationIgnored private var tagGeneration = 0
     @ObservationIgnored private var scheduleGeneration = 0
     @ObservationIgnored private var queuedBuffers = 0
     @ObservationIgnored private var fadeGeneration = 0
@@ -93,6 +101,7 @@ final class MusicPlayer {
         isMuted = defaults.bool(forKey: Keys.muted)
         focusModulation = defaults.bool(forKey: Keys.focusModulation)
         modulationDepth = ModulationDepth(rawValue: defaults.string(forKey: Keys.modulationDepth) ?? "") ?? .medium
+        skippedTags = Set(defaults.stringArray(forKey: Keys.skippedTags) ?? [])
 
         engine.attach(node)
         engine.attach(modulator)
@@ -111,6 +120,66 @@ final class MusicPlayer {
         queue = []
         history = history.filter(tracks.contains)
         if let current, !tracks.contains(current) { stop() }
+        loadTags(for: tracks)
+    }
+
+    // MARK: Tag filter
+
+    /// Tracks the shuffle may pick: untagged ones, and tagged ones with no skipped tag.
+    var playableTracks: [URL] { tracks.filter(isPlayable) }
+
+    func isPlayable(_ url: URL) -> Bool {
+        (trackTags[url] ?? []).allSatisfy { !skippedTags.contains($0) }
+    }
+
+    /// Every tag found in the folder with its song count, alphabetical.
+    var allTags: [(tag: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for tags in trackTags.values { for tag in tags { counts[tag, default: 0] += 1 } }
+        return counts.map { ($0.key, $0.value) }.sorted { $0.tag < $1.tag }
+    }
+
+    func setTag(_ tag: String, enabled: Bool) {
+        if enabled { skippedTags.remove(tag) } else { skippedTags.insert(tag) }
+        applyFilter()
+    }
+
+    func enableAllTags() {
+        skippedTags = []
+        applyFilter()
+    }
+
+    /// Reshuffles with the new filter; a now-skipped current song gives way to the next
+    /// playable one, and music resumes if the filter allows songs again.
+    private func applyFilter() {
+        queue = []
+        if let current, !isPlayable(current) {
+            if playableTracks.isEmpty {
+                let wasPlaying = isPlaying
+                stop()
+                isPlaying = wasPlaying
+            } else {
+                advance()
+            }
+        } else if isPlaying, current == nil {
+            advance()
+        }
+    }
+
+    private func loadTags(for urls: [URL]) {
+        tagGeneration += 1
+        let generation = tagGeneration
+        Task { @MainActor [weak self] in
+            let tags = await withTaskGroup(of: (URL, [String]).self) { group in
+                for url in urls { group.addTask { (url, await MusicLibrary.tags(for: url)) } }
+                var result: [URL: [String]] = [:]
+                for await (url, tags) in group { result[url] = tags }
+                return result
+            }
+            guard let self, self.tagGeneration == generation else { return }
+            self.trackTags = tags
+            self.applyFilter()
+        }
     }
 
     func play() {
@@ -189,7 +258,7 @@ final class MusicPlayer {
 
     private func advance() {
         if queue.isEmpty {
-            queue = tracks.shuffled()
+            queue = playableTracks.shuffled()
             // Avoid replaying the same track right after a reshuffle.
             if queue.count > 1, queue.first == current { queue.swapAt(0, 1) }
         }

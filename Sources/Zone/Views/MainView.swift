@@ -1,19 +1,24 @@
 import SwiftUI
 
-/// Shared by the main window and the menu bar panel. Settings replace the
-/// session view in place; the back arrow (or Escape) returns.
+/// Shared by the main window and the menu bar panel. Settings and the tag filter
+/// replace the session view in place; the back arrow (or Escape) returns.
 struct MainView: View {
     @Environment(AppState.self) private var state
     @Environment(\.palette) private var palette
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
-    @State private var showingSettings = false
+    @State private var screen = Screen.session
+
+    private enum Screen { case session, settings, filter }
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
-            if showingSettings {
-                SettingsView { showingSettings = false }
-            } else {
+            switch screen {
+            case .settings:
+                SettingsView { screen = .session }
+            case .filter:
+                FilterView { screen = .session }
+            case .session:
                 VStack(spacing: 20) {
                     header
                     TimerRing(timer: state.timer)
@@ -34,8 +39,15 @@ struct MainView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Spacer()
+            IconButton(
+                systemName: filtering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
+                help: "Filter songs by tag",
+                tint: filtering ? palette.accent : nil
+            ) {
+                screen = .filter
+            }
             IconButton(systemName: "gearshape", help: "Settings") {
-                showingSettings = true
+                screen = .settings
             }
             .keyboardShortcut(",", modifiers: .command)
             if showInMenuBar {
@@ -45,6 +57,8 @@ struct MainView: View {
             }
         }
     }
+
+    private var filtering: Bool { !state.music.skippedTags.isEmpty }
 
     @ViewBuilder
     private var trackInfo: some View {
@@ -57,9 +71,18 @@ struct MainView: View {
                     .foregroundStyle(palette.link)
             }
             .font(.callout)
+        } else if state.music.current == nil, state.music.playableTracks.isEmpty {
+            HStack(spacing: 4) {
+                Text("No songs match the filter.")
+                    .foregroundStyle(palette.muted)
+                Button("Edit…") { screen = .filter }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(palette.link)
+            }
+            .font(.callout)
         } else {
             Label(
-                (state.music.current?.deletingPathExtension().lastPathComponent ?? "\(state.music.tracks.count) tracks ready")
+                (state.music.current?.deletingPathExtension().lastPathComponent ?? "\(state.music.playableTracks.count) tracks ready")
                     + (state.music.focusModulation ? " · 16 Hz" : ""),
                 systemImage: "music.note"
             )
@@ -75,6 +98,8 @@ struct IconButton: View {
     let systemName: String
     var size: CGFloat = 14
     let help: String
+    /// Fixed color (e.g. accent for an active state); otherwise muted, brighter on hover.
+    var tint: Color?
     let action: () -> Void
 
     @Environment(\.palette) private var palette
@@ -88,7 +113,7 @@ struct IconButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(hovering ? palette.text : palette.muted)
+        .foregroundStyle(tint ?? (hovering ? palette.text : palette.muted))
         .onHover { hovering = $0 }
         .help(help)
     }

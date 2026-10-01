@@ -1,4 +1,4 @@
-import Foundation
+import AVFoundation
 
 enum MusicLibrary {
     static let audioExtensions: Set<String> = ["m4a", "mp3", "aac", "wav", "aiff"]
@@ -37,5 +37,19 @@ enum MusicLibrary {
         return contents
             .filter { audioExtensions.contains($0.pathExtension.lowercased()) }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    /// Tags written by Zone Admin: comma-separated, lowercase words in the iTunes Grouping field.
+    static func tags(for url: URL) async -> [String] {
+        guard let items = try? await AVURLAsset(url: url).load(.metadata),
+              // Matched by raw identifier: the .iTunesMetadataGrouping lookup misses it in these files.
+              let grouping = items.first(where: { $0.identifier?.rawValue == "itsk/%A9grp" }),
+              let value = try? await grouping.load(.stringValue)
+        else { return [] }
+        var seen = Set<String>()
+        return value
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 }

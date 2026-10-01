@@ -10,4 +10,5 @@ enum Keys {
     static let folderBookmark = "folderBookmark"
     static let focusModulation = "focusModulation"
     static let modulationDepth = "modulationDepth"
+    static let skippedTags = "skippedTags"
 }
