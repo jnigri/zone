@@ -22,6 +22,8 @@
 	<string>15.0</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Zone checks the current browser tab to block distracting sites during a session.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

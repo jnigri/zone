@@ -8,6 +8,8 @@ struct SettingsView: View {
     @Environment(\.palette) private var palette
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
     @AppStorage(Keys.theme) private var theme: ThemeMode = .system
+    @AppStorage(Keys.blockSites) private var blockSites = true
+    @AppStorage(Keys.blockedSites) private var blockedSites = SiteBlocker.defaultSites
     @AppStorage(Keys.keepAwake) private var keepAwake = true
 
     var body: some View {
@@ -47,6 +49,22 @@ struct SettingsView: View {
                 Toggle("Keep Mac awake during sessions", isOn: $keepAwake)
                     .onChange(of: keepAwake) { state.keepAwakeChanged() }
                 caption("The screen stays on and won't lock while a session runs. Pausing lets it sleep again.")
+            }
+
+            card {
+                Toggle("Block sites during sessions", isOn: $blockSites)
+                // TextEditor, not a vertical TextField: on macOS Return ends editing in a TextField.
+                TextEditor(text: $blockedSites)
+                    .font(.callout)
+                    .scrollContentBackground(.hidden)
+                    .autocorrectionDisabled()
+                    .padding(6)
+                    .frame(height: 90)
+                    .background(palette.background, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.raised, lineWidth: 1))
+                    .disabled(!blockSites)
+                    .opacity(blockSites ? 1 : 0.5)
+                caption("One domain per line. Works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for permission.")
             }
 
             card {
