@@ -58,7 +58,7 @@ struct MainView: View {
         }
     }
 
-    private var filtering: Bool { !state.music.skippedTags.isEmpty }
+    private var filtering: Bool { !state.music.selectedTags.isEmpty }
 
     @ViewBuilder
     private var trackInfo: some View {
@@ -81,15 +81,22 @@ struct MainView: View {
             }
             .font(.callout)
         } else {
-            Label(
-                (state.music.current?.deletingPathExtension().lastPathComponent ?? "\(state.music.playableTracks.count) tracks ready")
-                    + (state.music.focusModulation ? " · 16 Hz" : ""),
-                systemImage: "music.note"
-            )
+            HStack(spacing: 2) {
+                Label(
+                    (state.music.current?.deletingPathExtension().lastPathComponent ?? "\(state.music.playableTracks.count) tracks ready")
+                        + (state.music.focusModulation ? " · 16 Hz" : ""),
+                    systemImage: "music.note"
+                )
+                .lineLimit(1)
+                .truncationMode(.middle)
+                if state.music.current != nil {
+                    IconButton(systemName: "hand.thumbsdown", size: 12, help: "Don't play this song again") {
+                        state.music.dislikeCurrent()
+                    }
+                }
+            }
             .font(.callout)
             .foregroundStyle(palette.muted)
-            .lineLimit(1)
-            .truncationMode(.middle)
         }
     }
 }

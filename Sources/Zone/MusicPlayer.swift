@@ -30,10 +30,15 @@ final class MusicPlayer {
     private(set) var tracks: [URL] = []
     /// Tags per track, read from the files after each reload.
     private(set) var trackTags: [URL: [String]] = [:]
-    /// Tags switched off in the filter: songs having any of them are skipped. Storing the
-    /// "off" set means tags added later start on.
-    private(set) var skippedTags: Set<String> {
-        didSet { UserDefaults.standard.set(skippedTags.sorted(), forKey: Keys.skippedTags) }
+    /// Tags picked in the filter: only songs having at least one of them play. Empty means
+    /// no filter, everything plays.
+    private(set) var selectedTags: Set<String> {
+        didSet { UserDefaults.standard.set(selectedTags.sorted(), forKey: Keys.selectedTags) }
+    }
+    /// File names of songs marked "don't like": never picked by the shuffle. Names rather
+    /// than paths so they survive moving the folder.
+    private(set) var dislikedSongs: Set<String> {
+        didSet { UserDefaults.standard.set(dislikedSongs.sorted(), forKey: Keys.dislikedSongs) }
     }
     private(set) var current: URL?
     private(set) var isPlaying = false
@@ -101,7 +106,10 @@ final class MusicPlayer {
         isMuted = defaults.bool(forKey: Keys.muted)
         focusModulation = defaults.bool(forKey: Keys.focusModulation)
         modulationDepth = ModulationDepth(rawValue: defaults.string(forKey: Keys.modulationDepth) ?? "") ?? .medium
-        skippedTags = Set(defaults.stringArray(forKey: Keys.skippedTags) ?? [])
+        selectedTags = Set(defaults.stringArray(forKey: Keys.selectedTags) ?? [])
+        // The filter used to store tags switched off; that meaning is gone.
+        defaults.removeObject(forKey: Keys.skippedTags)
+        dislikedSongs = Set(defaults.stringArray(forKey: Keys.dislikedSongs) ?? [])
 
         engine.attach(node)
         engine.attach(modulator)
@@ -125,11 +133,11 @@ final class MusicPlayer {
 
     // MARK: Tag filter
 
-    /// Tracks the shuffle may pick: untagged ones, and tagged ones with no skipped tag.
+    /// Tracks the shuffle may pick: not disliked, and with a picked tag when any are picked.
     var playableTracks: [URL] { tracks.filter(isPlayable) }
 
     func isPlayable(_ url: URL) -> Bool {
-        (trackTags[url] ?? []).allSatisfy { !skippedTags.contains($0) }
+        !isDisliked(url) && (selectedTags.isEmpty || (trackTags[url] ?? []).contains(where: selectedTags.contains))
     }
 
     /// Every tag found in the folder with its song count, alphabetical.
@@ -139,20 +147,32 @@ final class MusicPlayer {
         return counts.map { ($0.key, $0.value) }.sorted { $0.tag < $1.tag }
     }
 
-    func setTag(_ tag: String, enabled: Bool) {
-        if enabled { skippedTags.remove(tag) } else { skippedTags.insert(tag) }
-        applyFilter()
+    func setTag(_ tag: String, selected: Bool) {
+        changeFilter { if selected { selectedTags.insert(tag) } else { selectedTags.remove(tag) } }
     }
 
-    func enableAllTags() {
-        skippedTags = []
-        applyFilter()
+    func clearTags() {
+        changeFilter { selectedTags = [] }
     }
 
-    /// Reshuffles with the new filter; a now-skipped current song gives way to the next
-    /// playable one, and music resumes if the filter allows songs again.
-    private func applyFilter() {
-        queue = []
+    /// Runs a filter change, then slots songs it newly allows into the upcoming queue.
+    private func changeFilter(_ change: () -> Void) {
+        let before = Set(playableTracks)
+        change()
+        applyFilter(allowed: playableTracks.filter { !before.contains($0) })
+    }
+
+    /// Keeps the shuffle order instead of reshuffling, so songs already heard this round
+    /// don't come straight back: skipped songs leave the queue and newly `allowed` ones go
+    /// in at random spots. A now-skipped current song gives way to the next playable one,
+    /// and music resumes if the filter allows songs again.
+    private func applyFilter(allowed: [URL] = []) {
+        queue.removeAll { !isPlayable($0) }
+        if !queue.isEmpty {
+            for url in allowed where url != current {
+                queue.insert(url, at: Int.random(in: 0...queue.count))
+            }
+        }
         if let current, !isPlayable(current) {
             if playableTracks.isEmpty {
                 let wasPlaying = isPlaying
@@ -164,6 +184,23 @@ final class MusicPlayer {
         } else if isPlaying, current == nil {
             advance()
         }
+    }
+
+    // MARK: Disliked songs
+
+    func isDisliked(_ url: URL) -> Bool { dislikedSongs.contains(url.lastPathComponent) }
+
+    /// Disliked songs present in the current folder, alphabetical.
+    var dislikedTracks: [URL] { tracks.filter(isDisliked) }
+
+    /// Drops the current song from rotation for good and moves on to the next one.
+    func dislikeCurrent() {
+        guard let current else { return }
+        changeFilter { dislikedSongs.insert(current.lastPathComponent) }
+    }
+
+    func restore(_ url: URL) {
+        changeFilter { dislikedSongs.remove(url.lastPathComponent) }
     }
 
     private func loadTags(for urls: [URL]) {
@@ -219,17 +256,19 @@ final class MusicPlayer {
         advance()
     }
 
-    /// Restarts the current track if it has played for more than 3s, otherwise goes back one.
+    /// Restarts the current track if it has played for more than 3s, otherwise goes back
+    /// one, passing over songs the filter now skips.
     func previous() {
         if stream != nil, currentTime > 3 {
             restartTrack()
             return
         }
+        history.removeAll { !isPlayable($0) }
         guard let previous = history.popLast() else {
             restartTrack()
             return
         }
-        if let current { queue.insert(current, at: 0) }
+        if let current, isPlayable(current) { queue.insert(current, at: 0) }
         load(previous)
     }
 
@@ -263,7 +302,7 @@ final class MusicPlayer {
             if queue.count > 1, queue.first == current { queue.swapAt(0, 1) }
         }
         guard !queue.isEmpty else { return }
-        if let current { history.append(current) }
+        if let current, isPlayable(current) { history.append(current) }
         load(queue.removeFirst())
     }
 

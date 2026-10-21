@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Tag filter shown in place of the session view: every tag found in the music folder,
-/// on by default; switching one off skips the songs that have it.
+/// Tag filter shown in place of the session view: every tag found in the music folder;
+/// picking some plays only songs that have one of them.
 struct FilterView: View {
     let onBack: () -> Void
 
@@ -18,24 +18,27 @@ struct FilterView: View {
                 Text("Filter")
                     .font(.system(.headline, design: .rounded))
                 Spacer()
+                IconButton(systemName: "arrow.clockwise", help: "Rescan folder for songs and tags") {
+                    state.rescanFolder()
+                }
             }
             .padding(.leading, -8)
 
             if tags.isEmpty {
                 card {
                     Text("No tags yet.")
-                    caption("Add tags to your songs with Zone Admin, then come back here to skip the ones you don't want right now.")
+                    caption("Add tags to your songs with Zone Admin, then come back here to pick what you want to hear right now.")
                 }
             } else {
                 card {
-                    caption("Turn a tag off to skip songs that have it. Untagged songs always play.")
+                    caption("Pick tags to play only songs that have one of them. With none picked, every song plays.")
                     FlowLayout(spacing: 6) {
                         ForEach(tags, id: \.tag) { item in
                             TagToggle(
                                 tag: item.tag,
                                 count: item.count,
-                                isOn: !music.skippedTags.contains(item.tag)
-                            ) { music.setTag(item.tag, enabled: $0) }
+                                isOn: music.selectedTags.contains(item.tag)
+                            ) { music.setTag(item.tag, selected: $0) }
                         }
                     }
                 }
@@ -45,11 +48,31 @@ struct FilterView: View {
                         .font(.callout)
                         .foregroundStyle(palette.muted)
                     Spacer()
-                    if !music.skippedTags.isEmpty {
-                        Button("Turn all on") { music.enableAllTags() }
+                    if !music.selectedTags.isEmpty {
+                        Button("Clear") { music.clearTags() }
                             .buttonStyle(.plain)
                             .font(.callout)
                             .foregroundStyle(palette.link)
+                    }
+                }
+            }
+
+            let disliked = music.dislikedTracks
+            if !disliked.isEmpty {
+                card {
+                    caption("Songs you marked as disliked never play. Restore one to put it back in rotation.")
+                    ForEach(disliked, id: \.self) { url in
+                        HStack(spacing: 6) {
+                            Text(url.deletingPathExtension().lastPathComponent)
+                                .font(.callout)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button("Restore") { music.restore(url) }
+                                .buttonStyle(.plain)
+                                .font(.callout)
+                                .foregroundStyle(palette.link)
+                        }
                     }
                 }
             }
@@ -86,7 +109,6 @@ private struct TagToggle: View {
         } label: {
             HStack(spacing: 5) {
                 Text(tag)
-                    .strikethrough(!isOn, color: palette.muted)
                 Text("\(count)")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(palette.muted)
@@ -100,6 +122,6 @@ private struct TagToggle: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(isOn ? "Playing songs tagged “\(tag)”, click to skip them" : "Skipping songs tagged “\(tag)”, click to play them")
+        .help(isOn ? "Playing songs tagged “\(tag)”, click to unpick" : "Click to play only songs tagged “\(tag)” (and other picked tags)")
     }
 }
