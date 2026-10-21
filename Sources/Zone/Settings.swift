@@ -11,4 +11,5 @@ enum Keys {
     static let focusModulation = "focusModulation"
     static let modulationDepth = "modulationDepth"
     static let skippedTags = "skippedTags"
+    static let keepAwake = "keepAwake"
 }

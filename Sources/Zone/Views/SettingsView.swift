@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(\.palette) private var palette
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
     @AppStorage(Keys.theme) private var theme: ThemeMode = .system
+    @AppStorage(Keys.keepAwake) private var keepAwake = true
 
     var body: some View {
         @Bindable var music = state.music
@@ -40,6 +41,12 @@ struct SettingsView: View {
                 .labelsHidden()
                 .disabled(!music.focusModulation)
                 caption("Gently pulses the mid-range of your music 16 times a second. Brain activity tends to sync with this rhythm, which is linked to sustained attention, helping you stay on task. Helps most if focusing is usually hard for you.")
+            }
+
+            card {
+                Toggle("Keep Mac awake during sessions", isOn: $keepAwake)
+                    .onChange(of: keepAwake) { state.keepAwakeChanged() }
+                caption("The screen stays on and won't lock while a session runs. Pausing lets it sleep again.")
             }
 
             card {

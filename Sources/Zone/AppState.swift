@@ -8,6 +8,7 @@ final class AppState {
 
     let timer: SessionTimer
     let music = MusicPlayer()
+    @ObservationIgnored private let caffeinator = Caffeinator()
     private(set) var folder: URL
     @ObservationIgnored private var nowPlaying: NowPlaying?
 
@@ -69,6 +70,11 @@ final class AppState {
         music.reload(folder: url)
     }
 
+    /// Applies the keep-awake setting to a session already running.
+    func keepAwakeChanged() {
+        caffeinator.update(active: timer.phase == .running)
+    }
+
     func rescanFolder() {
         music.reload(folder: folder)
     }
@@ -82,6 +88,7 @@ final class AppState {
 
     private func syncNowPlaying() {
         nowPlaying?.update(from: self)
+        caffeinator.update(active: timer.phase == .running)
     }
 }
 
