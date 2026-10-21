@@ -28,4 +28,4 @@ Requires macOS 15+ and a Swift 6 toolchain. The build uses Xcode when installed;
   second. Brain activity tends to sync with this beta-range rhythm, which is linked to sustained attention
   ([Woods et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11499863/)). Subtle / Medium / Strong set
   how deep the pulse dips.
-- Settings (gear or ⌘,, opens in place; back arrow or Escape returns): menu bar mode (hides Dock icon, panel under status icon), theme System/Dark/Light.
+- Settings (gear or ⌘,, opens in place; back arrow or Escape returns): menu bar mode (hides Dock icon; right-click status icon to play/pause, left-click for panel; time shown while active, grayed out while paused), theme System/Dark/Light.

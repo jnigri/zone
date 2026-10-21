@@ -41,18 +41,19 @@ struct ZoneApp: App {
                 .environment(state)
                 .themed()
         } label: {
-            MenuBarLabel(timer: state.timer)
+            MenuBarLabel(state: state)
         }
         .menuBarExtraStyle(.window)
     }
 }
 
 struct MenuBarLabel: View {
-    let timer: SessionTimer
+    let state: AppState
 
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        let timer = state.timer
         HStack(spacing: 4) {
             Image(nsImage: Logo.templateImage)
             if timer.phase == .running || timer.phase == .paused {
@@ -61,7 +62,46 @@ struct MenuBarLabel: View {
                     .monospacedDigit()
             }
         }
-        .onAppear { AppMode.openWindow = openWindow }
+        .onAppear {
+            AppMode.openWindow = openWindow
+            StatusItemClicks.install(state: state)
+            StatusItemClicks.dim(timer.phase == .paused)
+        }
+        .onChange(of: timer.phase) { _, phase in StatusItemClicks.dim(phase == .paused) }
+    }
+}
+
+/// Right-click (or Control-click) on the status icon toggles play/pause; left-click
+/// still opens the panel. MenuBarExtra has no click hook, so this intercepts the
+/// icon's mouse-down before its button sees it.
+enum StatusItemClicks {
+    private static var monitor: Any?
+
+    static func install(state: AppState) {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+            guard let window = event.window, window.className == "NSStatusBarWindow" else { return event }
+            guard event.type == .rightMouseDown || event.modifierFlags.contains(.control) else { return event }
+            state.togglePlay()
+            return nil
+        }
+    }
+
+    /// Grays out icon and time the way macOS draws a disabled status item.
+    /// SwiftUI opacity doesn't reach the menu bar, so this sets it on the button itself.
+    static func dim(_ dimmed: Bool) {
+        // Next run loop turn: on first appearance the button isn't in its window yet.
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.className == "NSStatusBarWindow" {
+                statusButton(in: window.contentView)?.appearsDisabled = dimmed
+            }
+        }
+    }
+
+    private static func statusButton(in view: NSView?) -> NSStatusBarButton? {
+        guard let view else { return nil }
+        if let button = view as? NSStatusBarButton { return button }
+        return view.subviews.lazy.compactMap { statusButton(in: $0) }.first
     }
 }
 
