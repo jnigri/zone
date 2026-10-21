@@ -39,11 +39,14 @@ enum MusicLibrary {
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// Tags written by Zone Admin: comma-separated, lowercase words in the iTunes Grouping field.
+    /// Grouping field as ffmpeg (used by Zone Admin) writes it: ©grp in MP4 files, TIT1 in MP3s.
+    /// Matched by raw identifier: the .iTunesMetadataGrouping lookup misses it in these files.
+    private static let groupingIdentifiers: Set<String> = ["itsk/%A9grp", "id3/TIT1"]
+
+    /// Tags written by Zone Admin: comma-separated, lowercase words in the Grouping field.
     static func tags(for url: URL) async -> [String] {
         guard let items = try? await AVURLAsset(url: url).load(.metadata),
-              // Matched by raw identifier: the .iTunesMetadataGrouping lookup misses it in these files.
-              let grouping = items.first(where: { $0.identifier?.rawValue == "itsk/%A9grp" }),
+              let grouping = items.first(where: { groupingIdentifiers.contains($0.identifier?.rawValue ?? "") }),
               let value = try? await grouping.load(.stringValue)
         else { return [] }
         var seen = Set<String>()
