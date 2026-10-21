@@ -10,7 +10,7 @@ make run      # build and open
 make install  # copy to /Applications
 ```
 
-Requires macOS 15+ and a Swift 6 toolchain (Command Line Tools are enough).
+Requires macOS 15+ and a Swift 6 toolchain. The build uses Xcode when installed; Command Line Tools 27.0 lack the SwiftUI macro plugin.
 
 ## Use
 

@@ -3,6 +3,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Prefer Xcode's toolchain: some Command Line Tools releases ship without the SwiftUI
+# macro plugin (@State fails with "plugin for module 'SwiftUIMacros' not found").
+if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode.app ]]; then
+    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+fi
+
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)/Zone"
 APP="Zone.app"
