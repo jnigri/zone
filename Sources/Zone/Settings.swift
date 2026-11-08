@@ -15,5 +15,7 @@ enum Keys {
     static let dislikedSongs = "dislikedSongs"
     static let blockSites = "blockSites"
     static let blockedSites = "blockedSites"
+    static let blockApps = "blockApps"
+    static let blockedApps = "blockedApps"
     static let keepAwake = "keepAwake"
 }

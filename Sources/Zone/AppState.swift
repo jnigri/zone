@@ -9,6 +9,7 @@ final class AppState {
     let timer: SessionTimer
     let music = MusicPlayer()
     @ObservationIgnored private let blocker = SiteBlocker()
+    @ObservationIgnored private let appBlocker = AppBlocker()
     @ObservationIgnored private let caffeinator = Caffeinator()
     private(set) var folder: URL
     @ObservationIgnored private var nowPlaying: NowPlaying?
@@ -90,6 +91,7 @@ final class AppState {
     private func syncNowPlaying() {
         nowPlaying?.update(from: self)
         blocker.update(active: timer.phase == .running)
+        appBlocker.update(active: timer.phase == .running)
         caffeinator.update(active: timer.phase == .running)
     }
 }

@@ -10,6 +10,8 @@ struct SettingsView: View {
     @AppStorage(Keys.theme) private var theme: ThemeMode = .system
     @AppStorage(Keys.blockSites) private var blockSites = true
     @AppStorage(Keys.blockedSites) private var blockedSites = SiteBlocker.defaultSites
+    @AppStorage(Keys.blockApps) private var blockApps = true
+    @AppStorage(Keys.blockedApps) private var blockedApps = AppBlocker.defaultApps
     @AppStorage(Keys.keepAwake) private var keepAwake = true
 
     var body: some View {
@@ -65,6 +67,34 @@ struct SettingsView: View {
                     .disabled(!blockSites)
                     .opacity(blockSites ? 1 : 0.5)
                 caption("One domain per line. Works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for permission.")
+            }
+
+            card {
+                Toggle("Quit apps during sessions", isOn: $blockApps)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(AppBlocker.ids(blockedApps), id: \.self) { id in
+                        let info = AppBlocker.info(for: id)
+                        HStack(spacing: 8) {
+                            if let icon = info?.icon {
+                                Image(nsImage: icon).resizable().frame(width: 18, height: 18)
+                            }
+                            Text(info?.name ?? id)
+                                .lineLimit(1)
+                            Spacer()
+                            IconButton(systemName: "xmark", size: 10, help: "Remove") {
+                                blockedApps = AppBlocker.ids(blockedApps).filter { $0 != id }.joined(separator: "\n")
+                            }
+                        }
+                    }
+                    Button("Add App…") {
+                        let ids = AppBlocker.ids(blockedApps)
+                        blockedApps = (ids + AppBlocker.pickApps().filter { !ids.contains($0) }).joined(separator: "\n")
+                    }
+                    .controlSize(.small)
+                }
+                .disabled(!blockApps)
+                .opacity(blockApps ? 1 : 0.5)
+                caption("Zone quits these apps when a session starts, and again if you open them during it.")
             }
 
             card {
