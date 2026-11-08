@@ -8,7 +8,7 @@ enum MusicLibrary {
     }
 
     /// The chosen folder, resolved from its bookmark so it survives renames/moves.
-    /// Falls back to ~/Music/Zone, created on first use.
+    /// Falls back to ~/Music/Zone, created on first use and filled with the songs bundled in the app.
     static func folder() -> URL {
         if let data = UserDefaults.standard.data(forKey: Keys.folderBookmark) {
             var stale = false
@@ -18,8 +18,21 @@ enum MusicLibrary {
             }
         }
         let url = defaultFolder
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: url.path) {
+            try? fm.createDirectory(at: url, withIntermediateDirectories: true)
+            copyBundledSongs(to: url)
+        }
         return url
+    }
+
+    /// Starter songs shipped in Zone.app/Contents/Resources/Music. Only copied into a brand-new
+    /// folder, so an existing library is never touched and deleted songs don't come back.
+    private static func copyBundledSongs(to folder: URL) {
+        guard let bundled = Bundle.main.resourceURL?.appending(path: "Music", directoryHint: .isDirectory) else { return }
+        for song in tracks(in: bundled) {
+            try? FileManager.default.copyItem(at: song, to: folder.appending(path: song.lastPathComponent))
+        }
     }
 
     static func save(_ url: URL) {
