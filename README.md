@@ -40,7 +40,7 @@ cd zone
 make install
 ```
 
-Zone is now in your Applications folder. On first launch it creates `~/Music/Zone` with the included songs.
+Then open Spotlight (⌘ Space), type **Zone**, press Return. That's it, the songs are ready to play.
 
 ## Tips
 
