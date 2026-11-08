@@ -1,41 +1,70 @@
-# Zone
+<p align="center">
+  <img src="docs/icon.png" width="220" alt="Zone app icon: a face with orange sunglasses and headphones">
+</p>
 
-Minimal macOS focus timer that plays shuffled music while you work.
+<h1 align="center">Zone</h1>
 
-## Build
+<p align="center">
+  <b>A focus timer for your Mac that plays music while you work.</b><br>
+  Pick a length, press play, get in the zone.
+</p>
+
+<p align="center">
+  <img src="docs/screenshot.png" width="320" alt="Zone window: 23:55 left on a 30 minute session, music playing">
+</p>
+
+## What it does
+
+- **One button for timer and music.** Choose 15 minutes, 30, an hour, open-ended (∞), or type any length.
+  Play starts both, pause stops both. When time's up, the music fades out and a chime lets you know.
+- **Music included.** Zone comes with 13 original tracks made for focus, from calm rain-window vibes to
+  upbeat grooves. Want your own? Point it at any folder of songs.
+- **Pick the mood.** Filter by tags like *calm*, *motivating* or *no vocals*. Don't like a song?
+  Thumbs-down and it never plays again.
+- **Distractions blocked.** During a session, YouTube and Netflix get swapped for a gentle "stay in the zone"
+  page, and apps like WhatsApp are closed. You choose the list.
+- **Focus modulation.** An optional 16 Hz pulse woven into the music, a rhythm linked to sustained attention
+  ([Woods et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11499863/)).
+- **Your Mac stays awake** until the session ends.
+- **Lives in your menu bar** if you like, with the time left always in view:
+
+  <img src="docs/menu-bar.png" width="86" alt="Zone in the menu bar showing 24m left">
+
+## Install
+
+You need macOS 15 or later and [Xcode](https://apps.apple.com/app/xcode/id497799835) (free).
 
 ```sh
-make app      # builds Zone.app (Swift Package + scripts/build-app.sh)
-make run      # build and open
-make install  # copy to /Applications
+git clone https://github.com/jnigri/zone.git
+cd zone
+make install
 ```
 
-Requires macOS 15+ and a Swift 6 toolchain. The build uses Xcode when installed; Command Line Tools 27.0 lack the SwiftUI macro plugin.
+Zone is now in your Applications folder. On first launch it creates `~/Music/Zone` with the included songs.
 
-## Use
+## Tips
 
-- Pick 15m / 30m / 1h, **∞** (open-ended, counts up) or **Custom**, then press play (or Space).
-- Play/pause drives both timer and music. Stop resets the session.
-- Music: every `.m4a` (also mp3/aac/wav/aiff) in `~/Music/Zone` by default; change folder in Settings.
-- At zero: music fades out, chime, notification.
-- Filter (funnel icon): lists every tag in the music folder; pick one or more to play only songs that have at least
-  one of them (none picked: everything plays). Tags live in each file's Grouping field (©grp in m4a, TIT1 in mp3),
-  editable in the Music app's Get Info window or any tag editor; separate several tags with commas.
-  Refresh button rescans the folder for songs and tags (same as Rescan in Settings).
-- Thumbs-down next to the song name: never play that song again (skips to the next one). Disliked songs are
-  listed at the bottom of Filter, where Restore puts them back in rotation. Remembered by file name.
-- Focus modulation (Settings, off by default): pulses the 200 Hz–1 kHz band of your music 16 times a
-  second. Brain activity tends to sync with this beta-range rhythm, which is linked to sustained attention
-  ([Woods et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11499863/)). Subtle / Medium / Strong set
-  how deep the pulse dips.
-- Keep awake (Settings, on by default): Mac doesn't sleep while a session runs.
-- Block sites (Settings, on by default; YouTube and Netflix to start): once a second during a session, Zone reads
-  the front tab of the frontmost browser (Safari, Chrome, Arc, Brave, Edge, Vivaldi) and replaces blocked pages
-  with a notice. macOS asks once per browser for Automation permission; deny it to opt out for that browser.
-- Quit apps (Settings, on by default; WhatsApp and VLC to start): blocked apps are asked to quit, like ⌘Q, when a
-  session starts and whenever opened during one. Edit the list or turn it off before your first session.
-- Settings (gear or ⌘,, opens in place; back arrow or Escape returns): menu bar mode (hides Dock icon; right-click status icon to play/pause, left-click for panel; time shown while active, grayed out while paused), theme System/Dark/Light.
+- **Keyboard:** Space plays and pauses, ⌘, opens Settings, Escape goes back.
+- **Menu bar mode** (Settings) hides the Dock icon. Left-click the icon for the panel, right-click to play or pause.
+- **Your own music:** Zone plays m4a, mp3, aac, wav and aiff files. Tags come from each file's Grouping field
+  (comma-separated), which you can edit in the Music app's Get Info window or any tag editor.
+  The refresh button in Filter picks up new songs.
+- **Disliked songs** are listed at the bottom of Filter, where Restore brings them back.
+- **Site blocking** works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for
+  permission; say no to leave that browser alone.
+- **Site and app blocking are on by default.** Edit the lists or turn them off in Settings before your first session.
+
+## Build from source
+
+```sh
+make app      # builds Zone.app
+make run      # builds and opens it
+```
+
+Requires a Swift 6 toolchain. The build uses Xcode when installed, since some Command Line Tools releases lack
+the SwiftUI macro plugin.
 
 ## License
 
-[MIT](LICENSE)
+The code is under the [MIT License](LICENSE). The songs in `Resources/Music` are not: see
+[their license](Resources/Music/LICENSE.md).
