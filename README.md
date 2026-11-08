@@ -22,7 +22,7 @@
 - **Pick the mood.** Filter by tags like *calm*, *motivating* or *no vocals*. Don't like a song?
   Thumbs-down and it never plays again.
 - **Distractions blocked.** During a session, YouTube and Netflix get swapped for a gentle "stay in the zone"
-  page, and apps like WhatsApp are closed. You choose the list.
+  page, and any apps you pick in Settings are closed.
 - **Focus modulation.** An optional 16 Hz pulse woven into the music, a rhythm linked to sustained attention
   ([Woods et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11499863/)).
 - **Your Mac stays awake** until the session ends.
@@ -52,7 +52,8 @@ Then open Spotlight (⌘ Space), type **Zone**, press Return. That's it, the son
 - **Disliked songs** are listed at the bottom of Filter, where Restore brings them back.
 - **Site blocking** works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for
   permission; say no to leave that browser alone.
-- **Site and app blocking are on by default.** Edit the lists or turn them off in Settings before your first session.
+- **Site blocking is on by default** for YouTube and Netflix; edit the list or turn it off in Settings. No apps are
+  closed until you add some.
 
 ## Build from source
 

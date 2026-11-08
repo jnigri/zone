@@ -4,7 +4,7 @@ import AppKit
 /// starts, and any that gets launched or brought to the front during it.
 /// Apps are matched by bundle identifier and asked to quit politely, like ⌘Q.
 final class AppBlocker {
-    static let defaultApps = "net.whatsapp.WhatsApp\norg.videolan.vlc"
+    static let defaultApps = ""
 
     private var observers: [NSObjectProtocol] = []
 
