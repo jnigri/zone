@@ -12,6 +12,7 @@ enum Keys {
     static let modulationDepth = "modulationDepth"
     static let skippedTags = "skippedTags"
     static let selectedTags = "selectedTags"
+    static let excludedTags = "excludedTags"
     static let dislikedSongs = "dislikedSongs"
     static let blockSites = "blockSites"
     static let blockedSites = "blockedSites"

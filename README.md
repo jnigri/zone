@@ -19,7 +19,7 @@
   Play starts both, pause stops both. When time's up, the music fades out and a chime lets you know.
 - **Music included.** Zone comes with 13 original tracks made for focus, from calm rain-window vibes to
   upbeat grooves. Want your own? Point it at any folder of songs.
-- **Pick the mood.** Filter by tags like *calm*, *motivating* or *no vocals*. Don't like a song?
+- **Pick the mood.** Play only *calm* songs, skip anything with *vocals*, and see what you'll hear. Don't like a song?
   Thumbs-down and it never plays again.
 - **Distractions blocked.** During a session, YouTube and Netflix get swapped for a gentle "stay in the zone"
   page, and any apps you pick in Settings are closed.

@@ -58,7 +58,7 @@ struct MainView: View {
         }
     }
 
-    private var filtering: Bool { !state.music.selectedTags.isEmpty }
+    private var filtering: Bool { state.music.isFiltering }
 
     @ViewBuilder
     private var trackInfo: some View {

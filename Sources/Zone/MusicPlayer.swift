@@ -30,10 +30,14 @@ final class MusicPlayer {
     private(set) var tracks: [URL] = []
     /// Tags per track, read from the files after each reload.
     private(set) var trackTags: [URL: [String]] = [:]
-    /// Tags picked in the filter: only songs having at least one of them play. Empty means
-    /// no filter, everything plays.
-    private(set) var selectedTags: Set<String> {
-        didSet { UserDefaults.standard.set(selectedTags.sorted(), forKey: Keys.selectedTags) }
+    /// Tags set to Include in the filter: when any are set, only songs having at least one of
+    /// them play. Empty means every song can play.
+    private(set) var includedTags: Set<String> {
+        didSet { UserDefaults.standard.set(includedTags.sorted(), forKey: Keys.selectedTags) }
+    }
+    /// Tags set to Exclude: songs having any of them never play, even if they have an included tag.
+    private(set) var excludedTags: Set<String> {
+        didSet { UserDefaults.standard.set(excludedTags.sorted(), forKey: Keys.excludedTags) }
     }
     /// File names of songs marked "don't like": never picked by the shuffle. Names rather
     /// than paths so they survive moving the folder.
@@ -106,7 +110,8 @@ final class MusicPlayer {
         isMuted = defaults.bool(forKey: Keys.muted)
         focusModulation = defaults.bool(forKey: Keys.focusModulation)
         modulationDepth = ModulationDepth(rawValue: defaults.string(forKey: Keys.modulationDepth) ?? "") ?? .medium
-        selectedTags = Set(defaults.stringArray(forKey: Keys.selectedTags) ?? [])
+        includedTags = Set(defaults.stringArray(forKey: Keys.selectedTags) ?? [])
+        excludedTags = Set(defaults.stringArray(forKey: Keys.excludedTags) ?? [])
         // The filter used to store tags switched off; that meaning is gone.
         defaults.removeObject(forKey: Keys.skippedTags)
         dislikedSongs = Set(defaults.stringArray(forKey: Keys.dislikedSongs) ?? [])
@@ -133,12 +138,18 @@ final class MusicPlayer {
 
     // MARK: Tag filter
 
-    /// Tracks the shuffle may pick: not disliked, and with a picked tag when any are picked.
+    /// Tracks the shuffle may pick: not disliked, no excluded tag, and an included tag when any are set.
     var playableTracks: [URL] { tracks.filter(isPlayable) }
 
     func isPlayable(_ url: URL) -> Bool {
-        !isDisliked(url) && (selectedTags.isEmpty || (trackTags[url] ?? []).contains(where: selectedTags.contains))
+        let tags = trackTags[url] ?? []
+        return !isDisliked(url)
+            && !tags.contains(where: excludedTags.contains)
+            && (includedTags.isEmpty || tags.contains(where: includedTags.contains))
     }
+
+    /// True when any tag is set to Include or Exclude.
+    var isFiltering: Bool { !includedTags.isEmpty || !excludedTags.isEmpty }
 
     /// Every tag found in the folder with its song count, alphabetical.
     var allTags: [(tag: String, count: Int)] {
@@ -147,12 +158,27 @@ final class MusicPlayer {
         return counts.map { ($0.key, $0.value) }.sorted { $0.tag < $1.tag }
     }
 
-    func setTag(_ tag: String, selected: Bool) {
-        changeFilter { if selected { selectedTags.insert(tag) } else { selectedTags.remove(tag) } }
+    func mode(for tag: String) -> TagMode {
+        includedTags.contains(tag) ? .include : excludedTags.contains(tag) ? .exclude : .normal
+    }
+
+    func setTag(_ tag: String, mode: TagMode) {
+        changeFilter {
+            includedTags.remove(tag)
+            excludedTags.remove(tag)
+            switch mode {
+            case .include: includedTags.insert(tag)
+            case .exclude: excludedTags.insert(tag)
+            case .normal: break
+            }
+        }
     }
 
     func clearTags() {
-        changeFilter { selectedTags = [] }
+        changeFilter {
+            includedTags = []
+            excludedTags = []
+        }
     }
 
     /// Runs a filter change, then slots songs it newly allows into the upcoming queue.
@@ -430,4 +456,9 @@ final class MusicPlayer {
         guard let unit = modulator.auAudioUnit as? FocusModulatorUnit else { return }
         unit.targetDepth.pointee = focusModulation ? modulationDepth.value : 0
     }
+}
+
+/// What the filter does with songs carrying a tag: Only, Skip, or nothing.
+enum TagMode {
+    case include, normal, exclude
 }
