@@ -28,16 +28,15 @@ enum ModulationDepth: String, CaseIterable, Identifiable {
 @Observable
 final class MusicPlayer {
     private(set) var tracks: [URL] = []
-    /// Tags per track, read from the files after each reload.
-    private(set) var trackTags: [URL: [String]] = [:]
-    /// Tags set to Include in the filter: when any are set, only songs having at least one of
-    /// them play. Empty means every song can play.
-    private(set) var includedTags: Set<String> {
-        didSet { UserDefaults.standard.set(includedTags.sorted(), forKey: Keys.selectedTags) }
+    /// Mood, genre and title per track, from the file names.
+    private(set) var songInfo: [URL: SongInfo] = [:]
+    /// The mood picked in the Music screen: only its songs play. Nil plays every song.
+    private(set) var mood: Mood? {
+        didSet { UserDefaults.standard.set(mood?.rawValue, forKey: Keys.mood) }
     }
-    /// Tags set to Exclude: songs having any of them never play, even if they have an included tag.
-    private(set) var excludedTags: Set<String> {
-        didSet { UserDefaults.standard.set(excludedTags.sorted(), forKey: Keys.excludedTags) }
+    /// The genre picked in the Music screen, lowercase. Nil plays every genre.
+    private(set) var genre: String? {
+        didSet { UserDefaults.standard.set(genre, forKey: Keys.genre) }
     }
     /// File names of songs marked "don't like": never picked by the shuffle. Names rather
     /// than paths so they survive moving the folder.
@@ -88,7 +87,6 @@ final class MusicPlayer {
     @ObservationIgnored private var queue: [URL] = []
     @ObservationIgnored private var history: [URL] = []
     @ObservationIgnored private var loadGeneration = 0
-    @ObservationIgnored private var tagGeneration = 0
     @ObservationIgnored private var scheduleGeneration = 0
     @ObservationIgnored private var queuedBuffers = 0
     @ObservationIgnored private var fadeGeneration = 0
@@ -110,10 +108,10 @@ final class MusicPlayer {
         isMuted = defaults.bool(forKey: Keys.muted)
         focusModulation = defaults.bool(forKey: Keys.focusModulation)
         modulationDepth = ModulationDepth(rawValue: defaults.string(forKey: Keys.modulationDepth) ?? "") ?? .medium
-        includedTags = Set(defaults.stringArray(forKey: Keys.selectedTags) ?? [])
-        excludedTags = Set(defaults.stringArray(forKey: Keys.excludedTags) ?? [])
-        // The filter used to store tags switched off; that meaning is gone.
-        defaults.removeObject(forKey: Keys.skippedTags)
+        mood = Mood(rawValue: defaults.string(forKey: Keys.mood) ?? "")
+        genre = defaults.string(forKey: Keys.genre)
+        // Left over from the tag filter that moods replaced.
+        for key in ["skippedTags", "selectedTags", "excludedTags"] { defaults.removeObject(forKey: key) }
         dislikedSongs = Set(defaults.stringArray(forKey: Keys.dislikedSongs) ?? [])
 
         engine.attach(node)
@@ -129,56 +127,50 @@ final class MusicPlayer {
     private var effectiveVolume: Float { isMuted ? 0 : Float(volume) }
 
     func reload(folder: URL) {
-        tracks = MusicLibrary.tracks(in: folder)
+        tracks = MusicLibrary.library(folder: folder)
         queue = []
         history = history.filter(tracks.contains)
         if let current, !tracks.contains(current) { stop() }
-        loadTags(for: tracks)
+        songInfo = Dictionary(uniqueKeysWithValues: tracks.map { ($0, SongInfo($0)) })
+        // A remembered genre the folder no longer has would leave nothing to play.
+        if let genre, !genres.contains(genre) { self.genre = nil }
+        applyFilter()
     }
 
-    // MARK: Tag filter
+    // MARK: Mood and genre
 
-    /// Tracks the shuffle may pick: not disliked, no excluded tag, and an included tag when any are set.
+    /// Tracks the shuffle may pick: not disliked, and of the picked mood and genre when set.
     var playableTracks: [URL] { tracks.filter(isPlayable) }
 
     func isPlayable(_ url: URL) -> Bool {
-        let tags = trackTags[url] ?? []
-        return !isDisliked(url)
-            && !tags.contains(where: excludedTags.contains)
-            && (includedTags.isEmpty || tags.contains(where: includedTags.contains))
+        !isDisliked(url) && matches(url, mood: mood)
     }
 
-    /// True when any tag is set to Include or Exclude.
-    var isFiltering: Bool { !includedTags.isEmpty || !excludedTags.isEmpty }
-
-    /// Every tag found in the folder with its song count, alphabetical.
-    var allTags: [(tag: String, count: Int)] {
-        var counts: [String: Int] = [:]
-        for tags in trackTags.values { for tag in tags { counts[tag, default: 0] += 1 } }
-        return counts.map { ($0.key, $0.value) }.sorted { $0.tag < $1.tag }
+    private func matches(_ url: URL, mood: Mood?) -> Bool {
+        let info = songInfo[url]
+        return (mood == nil || info?.mood == mood) && (genre == nil || info?.genre == genre)
     }
 
-    func mode(for tag: String) -> TagMode {
-        includedTags.contains(tag) ? .include : excludedTags.contains(tag) ? .exclude : .normal
+    /// How many songs would play with `mood` picked, given the current genre and dislikes.
+    func songCount(for mood: Mood?) -> Int {
+        tracks.count { !isDisliked($0) && matches($0, mood: mood) }
     }
 
-    func setTag(_ tag: String, mode: TagMode) {
-        changeFilter {
-            includedTags.remove(tag)
-            excludedTags.remove(tag)
-            switch mode {
-            case .include: includedTags.insert(tag)
-            case .exclude: excludedTags.insert(tag)
-            case .normal: break
-            }
-        }
+    /// Every genre found in the folder's file names, alphabetical.
+    var genres: [String] {
+        Set(songInfo.values.compactMap(\.genre)).sorted()
     }
 
-    func clearTags() {
-        changeFilter {
-            includedTags = []
-            excludedTags = []
-        }
+    func title(for url: URL) -> String {
+        songInfo[url]?.title ?? url.deletingPathExtension().lastPathComponent
+    }
+
+    func setMood(_ mood: Mood?) {
+        changeFilter { self.mood = mood }
+    }
+
+    func setGenre(_ genre: String?) {
+        changeFilter { self.genre = genre }
     }
 
     /// Runs a filter change, then slots songs it newly allows into the upcoming queue.
@@ -191,7 +183,7 @@ final class MusicPlayer {
     /// Keeps the shuffle order instead of reshuffling, so songs already heard this round
     /// don't come straight back: skipped songs leave the queue and newly `allowed` ones go
     /// in at random spots. A now-skipped current song gives way to the next playable one,
-    /// and music resumes if the filter allows songs again.
+    /// and music resumes if the mood allows songs again.
     private func applyFilter(allowed: [URL] = []) {
         queue.removeAll { !isPlayable($0) }
         if !queue.isEmpty {
@@ -227,22 +219,6 @@ final class MusicPlayer {
 
     func restore(_ url: URL) {
         changeFilter { dislikedSongs.remove(url.lastPathComponent) }
-    }
-
-    private func loadTags(for urls: [URL]) {
-        tagGeneration += 1
-        let generation = tagGeneration
-        Task { @MainActor [weak self] in
-            let tags = await withTaskGroup(of: (URL, [String]).self) { group in
-                for url in urls { group.addTask { (url, await MusicLibrary.tags(for: url)) } }
-                var result: [URL: [String]] = [:]
-                for await (url, tags) in group { result[url] = tags }
-                return result
-            }
-            guard let self, self.tagGeneration == generation else { return }
-            self.trackTags = tags
-            self.applyFilter()
-        }
     }
 
     func play() {
@@ -456,9 +432,4 @@ final class MusicPlayer {
         guard let unit = modulator.auAudioUnit as? FocusModulatorUnit else { return }
         unit.targetDepth.pointee = focusModulation ? modulationDepth.value : 0
     }
-}
-
-/// What the filter does with songs carrying a tag: Only, Skip, or nothing.
-enum TagMode {
-    case include, normal, exclude
 }

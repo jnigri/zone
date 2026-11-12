@@ -122,6 +122,7 @@ struct SettingsView: View {
                     Button("Choose…") { state.chooseFolder() }
                 }
                 .controlSize(.small)
+                caption("Zone plays its own songs plus the ones in this folder.")
             }
         }
         .toggleStyle(.switch)

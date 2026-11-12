@@ -55,7 +55,7 @@ struct MenuBarLabel: View {
     var body: some View {
         let timer = state.timer
         HStack(spacing: 4) {
-            Image(nsImage: Logo.templateImage)
+            Image(nsImage: state.music.mood == .beastMode ? Logo.beastImage : Logo.templateImage)
             if timer.phase == .running || timer.phase == .paused {
                 // Leading space: the menu bar ignores HStack spacing between icon and title.
                 Text(" " + timer.displayTime.compactString(countingUp: timer.isInfinite))

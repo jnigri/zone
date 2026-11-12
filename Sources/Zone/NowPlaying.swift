@@ -48,7 +48,7 @@ final class NowPlaying {
 
         let music = state.music
         var details: [String: Any] = [
-            MPMediaItemPropertyTitle: music.current?.deletingPathExtension().lastPathComponent ?? "Zone session",
+            MPMediaItemPropertyTitle: music.current.map(music.title) ?? "Zone session",
             MPMediaItemPropertyArtist: "Zone",
             MPNowPlayingInfoPropertyPlaybackRate: music.isPlaying ? 1.0 : 0.0,
         ]

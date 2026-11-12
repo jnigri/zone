@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared by the main window and the menu bar panel. Settings and the tag filter
+/// Shared by the main window and the menu bar panel. Settings and the music picker
 /// replace the session view in place; the back arrow (or Escape) returns.
 struct MainView: View {
     @Environment(AppState.self) private var state
@@ -8,7 +8,7 @@ struct MainView: View {
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
     @State private var screen = Screen.session
 
-    private enum Screen { case session, settings, filter }
+    private enum Screen { case session, settings, music }
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -16,8 +16,8 @@ struct MainView: View {
             switch screen {
             case .settings:
                 SettingsView { screen = .session }
-            case .filter:
-                FilterView { screen = .session }
+            case .music:
+                MoodView { screen = .session }
             case .session:
                 VStack(spacing: 20) {
                     header
@@ -38,14 +38,8 @@ struct MainView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
+            moodButton
             Spacer()
-            IconButton(
-                systemName: filtering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
-                help: "Filter songs by tag",
-                tint: filtering ? palette.accent : nil
-            ) {
-                screen = .filter
-            }
             IconButton(systemName: "gearshape", help: "Settings") {
                 screen = .settings
             }
@@ -58,7 +52,33 @@ struct MainView: View {
         }
     }
 
-    private var filtering: Bool { state.music.isFiltering }
+    /// Shows what is playing ("Ultra Focus · Lofi") and opens the picker.
+    private var moodButton: some View {
+        let music = state.music
+        let title = [music.mood?.title ?? "Any Mood", music.genre?.capitalized]
+            .compactMap(\.self)
+            .joined(separator: " · ")
+        return Button {
+            screen = .music
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: music.mood?.symbol ?? "shuffle")
+                    .foregroundStyle(music.mood == nil ? palette.muted : palette.accent)
+                Text(title)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(palette.muted)
+            }
+            .font(.system(.callout, design: .rounded, weight: .medium))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(palette.panel, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Pick a mood and genre")
+    }
 
     @ViewBuilder
     private var trackInfo: some View {
@@ -73,9 +93,9 @@ struct MainView: View {
             .font(.callout)
         } else if state.music.current == nil, state.music.playableTracks.isEmpty {
             HStack(spacing: 4) {
-                Text("No songs match the filter.")
+                Text("No songs for this mood yet.")
                     .foregroundStyle(palette.muted)
-                Button("Edit…") { screen = .filter }
+                Button("Change…") { screen = .music }
                     .buttonStyle(.plain)
                     .foregroundStyle(palette.link)
             }
@@ -83,7 +103,7 @@ struct MainView: View {
         } else {
             HStack(spacing: 2) {
                 Label(
-                    (state.music.current?.deletingPathExtension().lastPathComponent ?? "\(state.music.playableTracks.count) tracks ready")
+                    (state.music.current.map(state.music.title) ?? "\(state.music.playableTracks.count) tracks ready")
                         + (state.music.focusModulation ? " · 16 Hz" : ""),
                     systemImage: "music.note"
                 )

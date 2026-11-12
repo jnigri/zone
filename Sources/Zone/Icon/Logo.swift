@@ -4,11 +4,19 @@ import AppKit
 /// the app bundle by scripts/build-app.sh). Its alpha is used as a mask everywhere:
 /// template image in the menu bar, accent-tinted in the header, charcoal on the app icon.
 enum Logo {
-    /// Logo cropped to its visible pixels, or nil when running outside the app bundle.
-    static let cgImage: CGImage? = {
-        guard let url = Bundle.main.url(forResource: "Logo", withExtension: "png") else { return nil }
-        return load(url)
+    /// Silhouette and sunglasses mask, both cropped to the visible pixels, or nil when running
+    /// outside the app bundle.
+    private static let parts: (logo: CGImage, lenses: CGImage)? = {
+        guard let url = Bundle.main.url(forResource: "Logo", withExtension: "png"),
+              let original = NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        else { return nil }
+        let bounds = opaqueBounds(of: original)
+        guard let logo = original.cropping(to: bounds), let lenses = lenses(in: original)?.cropping(to: bounds)
+        else { return nil }
+        return (logo, lenses)
     }()
+
+    static var cgImage: CGImage? { parts?.logo }
 
     /// Template image for the menu bar (and the header, tinted); macOS colors it to fit.
     static let templateImage: NSImage = {
@@ -20,6 +28,20 @@ enum Logo {
         let image = NSImage(cgImage: cgImage, size: size)
         image.isTemplate = true
         return image
+    }()
+
+    /// Menu bar image for Beast Mode: the same face with orange lenses. A colored image can't
+    /// be a template, so it draws itself white or black to match the menu bar it lands in.
+    static let beastImage: NSImage = {
+        guard let parts else { return templateImage }
+        return NSImage(size: templateImage.size, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            let dark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ctx.interpolationQuality = .high
+            drawTinted(parts.lenses, in: rect, color: orange, ctx: ctx)
+            drawTinted(parts.logo, in: rect, color: CGColor(gray: dark ? 1 : 0, alpha: dark ? 1 : 0.85), ctx: ctx)
+            return true
+        }
     }()
 
     // MARK: App icon
@@ -156,14 +178,7 @@ enum Logo {
         }
     }
 
-    // MARK: Loading
-
-    private static func load(_ url: URL) -> CGImage? {
-        guard let image = NSImage(contentsOf: url),
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        else { return nil }
-        return cgImage.cropping(to: opaqueBounds(of: cgImage)) ?? cgImage
-    }
+    // MARK: Measuring
 
     /// Bounding box of pixels that aren't (nearly) transparent, in CGImage coordinates (top-left origin).
     private static func opaqueBounds(of image: CGImage) -> CGRect {
