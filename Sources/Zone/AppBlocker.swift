@@ -32,14 +32,9 @@ final class AppBlocker {
     private func quitIfBlocked(_ app: NSRunningApplication) {
         guard isEnabled,
               let id = app.bundleIdentifier,
-              Self.ids(UserDefaults.standard.string(forKey: Keys.blockedApps) ?? Self.defaultApps).contains(id)
+              StoredList.enabled(Keys.blockedApps, default: Self.defaultApps, disabledKey: Keys.disabledApps).contains(id)
         else { return }
         app.terminate()
-    }
-
-    /// Stored list (one bundle identifier per line) → identifiers.
-    static func ids(_ stored: String) -> [String] {
-        stored.split(whereSeparator: \.isNewline).map(String.init)
     }
 
     /// Display name and icon of an installed app, or nil once it's been uninstalled.

@@ -12,7 +12,10 @@ struct SettingsView: View {
     @AppStorage(Keys.blockedSites) private var blockedSites = SiteBlocker.defaultSites
     @AppStorage(Keys.blockApps) private var blockApps = true
     @AppStorage(Keys.blockedApps) private var blockedApps = AppBlocker.defaultApps
+    @AppStorage(Keys.disabledSites) private var disabledSites = ""
+    @AppStorage(Keys.disabledApps) private var disabledApps = ""
     @AppStorage(Keys.keepAwake) private var keepAwake = true
+    @State private var newSite = ""
 
     var body: some View {
         @Bindable var music = state.music
@@ -55,42 +58,49 @@ struct SettingsView: View {
 
             card {
                 Toggle("Block sites during sessions", isOn: $blockSites)
-                // TextEditor, not a vertical TextField: on macOS Return ends editing in a TextField.
-                TextEditor(text: $blockedSites)
-                    .font(.callout)
-                    .scrollContentBackground(.hidden)
-                    .autocorrectionDisabled()
-                    .padding(6)
-                    .frame(height: 90)
-                    .background(palette.background, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.raised, lineWidth: 1))
-                    .disabled(!blockSites)
-                    .opacity(blockSites ? 1 : 0.5)
-                caption("One domain per line. Works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for permission.")
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(StoredList.items(blockedSites), id: \.self) { site in
+                        BlockRow(name: site, isOn: isOn(site, disabled: $disabledSites),
+                                 remove: { remove(site, from: $blockedSites, disabled: $disabledSites) }) {
+                            SiteIcon(site: SiteBlocker.normalize(site))
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        TextField("Add site, e.g. reddit.com", text: $newSite)
+                            .textFieldStyle(.roundedBorder)
+                            .autocorrectionDisabled()
+                            .onSubmit(addSite)
+                        Button("Add", action: addSite)
+                            .disabled(SiteBlocker.normalize(newSite).isEmpty)
+                    }
+                    .controlSize(.small)
+                    .padding(.top, 2)
+                }
+                .disabled(!blockSites)
+                .opacity(blockSites ? 1 : 0.5)
+                caption("Works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for permission.")
             }
 
             card {
                 Toggle("Quit apps during sessions", isOn: $blockApps)
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(AppBlocker.ids(blockedApps), id: \.self) { id in
+                    ForEach(StoredList.items(blockedApps), id: \.self) { id in
                         let info = AppBlocker.info(for: id)
-                        HStack(spacing: 8) {
+                        BlockRow(name: info?.name ?? id, isOn: isOn(id, disabled: $disabledApps),
+                                 remove: { remove(id, from: $blockedApps, disabled: $disabledApps) }) {
                             if let icon = info?.icon {
-                                Image(nsImage: icon).resizable().frame(width: 18, height: 18)
-                            }
-                            Text(info?.name ?? id)
-                                .lineLimit(1)
-                            Spacer()
-                            IconButton(systemName: "xmark", size: 10, help: "Remove") {
-                                blockedApps = AppBlocker.ids(blockedApps).filter { $0 != id }.joined(separator: "\n")
+                                Image(nsImage: icon).resizable()
+                            } else {
+                                Image(systemName: "app.dashed").foregroundStyle(palette.muted)
                             }
                         }
                     }
                     Button("Add App…") {
-                        let ids = AppBlocker.ids(blockedApps)
-                        blockedApps = (ids + AppBlocker.pickApps().filter { !ids.contains($0) }).joined(separator: "\n")
+                        let ids = StoredList.items(blockedApps)
+                        blockedApps = StoredList.string(ids + AppBlocker.pickApps().filter { !ids.contains($0) })
                     }
                     .controlSize(.small)
+                    .padding(.top, 2)
                 }
                 .disabled(!blockApps)
                 .opacity(blockApps ? 1 : 0.5)
@@ -118,6 +128,32 @@ struct SettingsView: View {
         .controlSize(.small)
         .onExitCommand(perform: onBack)
         .onChange(of: theme) { _, mode in mode.apply() }
+    }
+
+    private func addSite() {
+        let site = SiteBlocker.normalize(newSite)
+        let sites = StoredList.items(blockedSites)
+        guard !site.isEmpty else { return }
+        if !sites.map(SiteBlocker.normalize).contains(site) {
+            blockedSites = StoredList.string(sites + [site])
+        }
+        newSite = ""
+    }
+
+    /// Switch state of one list item: on unless listed in `disabled`.
+    private func isOn(_ item: String, disabled: Binding<String>) -> Binding<Bool> {
+        Binding(
+            get: { !StoredList.items(disabled.wrappedValue).contains(item) },
+            set: { on in
+                let others = StoredList.items(disabled.wrappedValue).filter { $0 != item }
+                disabled.wrappedValue = StoredList.string(on ? others : others + [item])
+            }
+        )
+    }
+
+    private func remove(_ item: String, from list: Binding<String>, disabled: Binding<String>) {
+        list.wrappedValue = StoredList.string(StoredList.items(list.wrappedValue).filter { $0 != item })
+        disabled.wrappedValue = StoredList.string(StoredList.items(disabled.wrappedValue).filter { $0 != item })
     }
 
     private var header: some View {
@@ -150,5 +186,88 @@ struct SettingsView: View {
             .font(.caption)
             .foregroundStyle(palette.muted)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// One site or app in a block list: icon, name, a switch to pause it, and a remove button.
+/// Clicking the icon or name flips the switch too.
+private struct BlockRow<Icon: View>: View {
+    let name: String
+    @Binding var isOn: Bool
+    let remove: () -> Void
+    @ViewBuilder let icon: () -> Icon
+
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
+                icon()
+                    .frame(width: 18, height: 18)
+                    .saturation(isOn ? 1 : 0)
+                    .opacity(isOn ? 1 : 0.45)
+                Text(name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(isOn ? palette.text : palette.muted)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { PillSwitch.flip($isOn) }
+            PillSwitch(label: name, isOn: $isOn)
+            IconButton(systemName: "xmark", size: 10, help: "Remove", action: remove)
+        }
+    }
+}
+
+/// Compact switch in the app's palette: accent track when on, raised track when off.
+private struct PillSwitch: View {
+    let label: String
+    @Binding var isOn: Bool
+
+    @Environment(\.palette) private var palette
+
+    static func flip(_ isOn: Binding<Bool>) {
+        withAnimation(.spring(duration: 0.25, bounce: 0.25)) { isOn.wrappedValue.toggle() }
+    }
+
+    var body: some View {
+        Button { Self.flip($isOn) } label: {
+            Capsule()
+                .fill(isOn ? palette.accent : palette.raised)
+                .frame(width: 28, height: 16)
+                .overlay(alignment: isOn ? .trailing : .leading) {
+                    Circle()
+                        .fill(.white)
+                        .padding(2)
+                        .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
+                }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(isOn ? "Pause" : "Resume")
+        .accessibilityRepresentation { Toggle(label, isOn: $isOn) }
+    }
+}
+
+/// Site favicon, or a globe until it loads (or if the site has none).
+private struct SiteIcon: View {
+    let site: String
+
+    @Environment(\.palette) private var palette
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image = image ?? Favicon.cached(site) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                Image(systemName: "globe").foregroundStyle(palette.muted)
+            }
+        }
+        .task(id: site) { image = await Favicon.load(site) }
     }
 }

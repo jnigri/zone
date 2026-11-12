@@ -35,9 +35,8 @@ final class SiteBlocker {
     }
 
     private var blockedSites: [String] {
-        (UserDefaults.standard.string(forKey: Keys.blockedSites) ?? Self.defaultSites)
-            .split(whereSeparator: \.isNewline)
-            .map { Self.normalize(String($0)) }
+        StoredList.enabled(Keys.blockedSites, default: Self.defaultSites, disabledKey: Keys.disabledSites)
+            .map(Self.normalize)
             .filter { !$0.isEmpty }
     }
 
@@ -65,7 +64,7 @@ final class SiteBlocker {
     }
 
     /// "https://www.YouTube.com/" or "www.youtube.com" → "youtube.com".
-    private static func normalize(_ site: String) -> String {
+    static func normalize(_ site: String) -> String {
         var s = site.trimmingCharacters(in: .whitespaces).lowercased()
         if let host = URL(string: s)?.host() { s = host }
         if s.hasPrefix("www.") { s.removeFirst(4) }
