@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icon.png" width="220" alt="Zone app icon: a face with orange sunglasses and headphones">
+  <img src="docs/icon.png" width="220" alt="Zone app icon: a pixel-art face with orange sunglasses and headphones">
 </p>
 
 <h1 align="center">Zone</h1>
