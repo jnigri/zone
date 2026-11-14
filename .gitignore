@@ -2,3 +2,8 @@
 .swiftpm/
 Zone.app/
 .DS_Store
+.env*
+*.xcuserstate
+xcuserdata/
+.vscode/
+.idea/
