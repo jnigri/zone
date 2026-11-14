@@ -7,6 +7,8 @@ struct MainView: View {
     @Environment(\.palette) private var palette
     @AppStorage(Keys.showInMenuBar) private var showInMenuBar = false
     @State private var screen = Screen.session
+    /// Settings scrolls within this height so switching screens doesn't resize the window.
+    @State private var sessionHeight: CGFloat = 480
 
     private enum Screen { case session, settings, music }
     @Environment(\.openWindow) private var openWindow
@@ -16,6 +18,7 @@ struct MainView: View {
             switch screen {
             case .settings:
                 SettingsView { screen = .session }
+                    .frame(height: sessionHeight)
             case .music:
                 MoodView { screen = .session }
             case .session:
@@ -26,6 +29,7 @@ struct MainView: View {
                     TransportBar()
                     trackInfo
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { sessionHeight = $0 }
             }
         }
         .padding(20)

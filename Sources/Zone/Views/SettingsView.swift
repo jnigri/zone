@@ -18,174 +18,214 @@ struct SettingsView: View {
     @AppStorage(Keys.quietApps) private var quietApps = KeySounds.defaultQuietApps
     @AppStorage(Keys.disabledQuietApps) private var disabledQuietApps = ""
     @State private var newSite = ""
+    @State private var tab = Tab.general
+
+    private enum Tab: CaseIterable, Identifiable {
+        case general, sound, blocking
+
+        var id: Self { self }
+        var title: String {
+            switch self {
+            case .general: "General"
+            case .sound: "Sound"
+            case .blocking: "Blocking"
+            }
+        }
+    }
 
     var body: some View {
-        @Bindable var music = state.music
-        @Bindable var keySounds = state.keySounds
-
         VStack(alignment: .leading, spacing: 14) {
             header
-
-            card {
-                Toggle("Show in menu bar", isOn: $showInMenuBar)
-                caption("Zone lives next to the clock and hides its Dock icon.")
+            Picker("Section", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.title).tag($0) }
             }
-
-            card {
-                row("Theme") {
-                    Picker("Theme", selection: $theme) {
-                        ForEach(ThemeMode.allCases) { Text($0.title).tag($0) }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    switch tab {
+                    case .general: general
+                    case .sound: sound
+                    case .blocking: blocking
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
                 }
             }
-
-            card {
-                Toggle("Focus modulation (16 Hz)", isOn: $music.focusModulation)
-                Picker("Intensity", selection: $music.modulationDepth) {
-                    ForEach(ModulationDepth.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .disabled(!music.focusModulation)
-                caption("Gently pulses the mid-range of your music 16 times a second. Brain activity tends to sync with this rhythm, which is linked to sustained attention, helping you stay on task. Helps most if focusing is usually hard for you.")
-            }
-
-            card {
-                Toggle("Keep Mac awake during sessions", isOn: $keepAwake)
-                    .onChange(of: keepAwake) { state.keepAwakeChanged() }
-                caption("The screen stays on and won't lock while a session runs. Pausing lets it sleep again.")
-            }
-
-            card {
-                Text("Keyboard sounds")
-                Picker("Keyboard sounds", selection: $keySounds.mode) {
-                    ForEach(KeySoundMode.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                if keySounds.needsPermission {
-                    HStack(alignment: .firstTextBaseline) {
-                        caption("Zone needs Input Monitoring permission to hear your keys.")
-                        Spacer()
-                        Button("Open Settings") { keySounds.openPermissionSettings() }
-                    }
-                }
-                if keySounds.mode != .off {
-                    row("Volume") {
-                        Slider(value: $keySounds.volume, in: 0...1)
-                            .frame(width: 150)
-                    }
-                    row("Pitch") {
-                        Picker("Pitch", selection: $keySounds.pitchVariation) {
-                            ForEach(KeySounds.pitchSteps, id: \.self) { Text($0.formatted()).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                    .help("Each keystroke is shifted up or down by up to this many semitones, so repeated keys sound natural.")
-                    Text("Quiet in")
-                        .padding(.top, 2)
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(StoredList.items(quietApps), id: \.self) { id in
-                            let info = AppBlocker.info(for: id)
-                            BlockRow(name: info?.name ?? id, isOn: isOn(id, disabled: $disabledQuietApps),
-                                     remove: { remove(id, from: $quietApps, disabled: $disabledQuietApps) }) {
-                                if let icon = info?.icon {
-                                    Image(nsImage: icon).resizable()
-                                } else {
-                                    Image(systemName: "app.dashed").foregroundStyle(palette.muted)
-                                }
-                            }
-                        }
-                        Button("Add App…") {
-                            let ids = StoredList.items(quietApps)
-                            quietApps = StoredList.string(ids + AppBlocker.pickApps(prompt: "Add").filter { !ids.contains($0) })
-                        }
-                        .controlSize(.small)
-                        .padding(.top, 2)
-                    }
-                }
-                caption("Switch clicks as you type, in any app. Always silent in password fields.")
-            }
-
-            card {
-                Toggle("Block sites during sessions", isOn: $blockSites)
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(StoredList.items(blockedSites), id: \.self) { site in
-                        BlockRow(name: site, isOn: isOn(site, disabled: $disabledSites),
-                                 remove: { remove(site, from: $blockedSites, disabled: $disabledSites) }) {
-                            SiteIcon(site: SiteBlocker.normalize(site))
-                        }
-                    }
-                    HStack(spacing: 6) {
-                        TextField("Add site, e.g. reddit.com", text: $newSite)
-                            .textFieldStyle(.roundedBorder)
-                            .autocorrectionDisabled()
-                            .onSubmit(addSite)
-                        Button("Add", action: addSite)
-                            .disabled(SiteBlocker.normalize(newSite).isEmpty)
-                    }
-                    .controlSize(.small)
-                    .padding(.top, 2)
-                }
-                .disabled(!blockSites)
-                .opacity(blockSites ? 1 : 0.5)
-                caption("Works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for permission.")
-            }
-
-            card {
-                Toggle("Quit apps during sessions", isOn: $blockApps)
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(StoredList.items(blockedApps), id: \.self) { id in
-                        let info = AppBlocker.info(for: id)
-                        BlockRow(name: info?.name ?? id, isOn: isOn(id, disabled: $disabledApps),
-                                 remove: { remove(id, from: $blockedApps, disabled: $disabledApps) }) {
-                            if let icon = info?.icon {
-                                Image(nsImage: icon).resizable()
-                            } else {
-                                Image(systemName: "app.dashed").foregroundStyle(palette.muted)
-                            }
-                        }
-                    }
-                    Button("Add App…") {
-                        let ids = StoredList.items(blockedApps)
-                        blockedApps = StoredList.string(ids + AppBlocker.pickApps().filter { !ids.contains($0) })
-                    }
-                    .controlSize(.small)
-                    .padding(.top, 2)
-                }
-                .disabled(!blockApps)
-                .opacity(blockApps ? 1 : 0.5)
-                caption("Zone quits these apps when a session starts, and again if you open them during it.")
-            }
-
-            card {
-                row("Music") {
-                    Text("\(music.tracks.count) tracks")
-                        .foregroundStyle(palette.muted)
-                }
-                Text(state.folder.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.callout)
-                    .foregroundStyle(palette.muted)
-                    .lineLimit(1)
-                    .truncationMode(.head)
-                HStack {
-                    Button("Rescan") { state.rescanFolder() }
-                    Button("Choose…") { state.chooseFolder() }
-                }
-                .controlSize(.small)
-                caption("Zone plays its own songs plus the ones in this folder.")
-            }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .toggleStyle(.switch)
         .controlSize(.small)
         .onExitCommand(perform: onBack)
         .onAppear { state.keySounds.refresh() }
         .onChange(of: theme) { _, mode in mode.apply() }
+    }
+
+    @ViewBuilder private var general: some View {
+        card {
+            Toggle("Show in menu bar", isOn: $showInMenuBar)
+            caption("Zone lives next to the clock and hides its Dock icon.")
+        }
+
+        card {
+            row("Theme") {
+                Picker("Theme", selection: $theme) {
+                    ForEach(ThemeMode.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+        }
+
+        card {
+            Toggle("Keep Mac awake during sessions", isOn: $keepAwake)
+                .onChange(of: keepAwake) { state.keepAwakeChanged() }
+            caption("The screen stays on and won't lock until you pause.")
+        }
+
+        card {
+            row("Music") {
+                Text("\(state.music.tracks.count) tracks")
+                    .foregroundStyle(palette.muted)
+            }
+            Text(state.folder.path(percentEncoded: false).replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                .font(.callout)
+                .foregroundStyle(palette.muted)
+                .lineLimit(1)
+                .truncationMode(.head)
+            HStack {
+                Button("Rescan") { state.rescanFolder() }
+                Button("Choose…") { state.chooseFolder() }
+            }
+            .controlSize(.small)
+            caption("Zone plays its own songs plus the ones in this folder.")
+        }
+    }
+
+    @ViewBuilder private var sound: some View {
+        @Bindable var music = state.music
+        @Bindable var keySounds = state.keySounds
+
+        card {
+            Toggle(isOn: $music.focusModulation) {
+                HStack(spacing: 4) {
+                    Text("Focus modulation (16 Hz)")
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(palette.muted)
+                        .help("Brain activity tends to sync with this rhythm, which is linked to sustained attention. Helps most if focusing is usually hard for you.")
+                }
+            }
+            Picker("Intensity", selection: $music.modulationDepth) {
+                ForEach(ModulationDepth.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .disabled(!music.focusModulation)
+            caption("Pulses your music 16 times a second to help you stay on task.")
+        }
+
+        card {
+            Text("Keyboard sounds")
+            Picker("Keyboard sounds", selection: $keySounds.mode) {
+                ForEach(KeySoundMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            if keySounds.needsPermission {
+                HStack(alignment: .firstTextBaseline) {
+                    caption("Zone needs Input Monitoring permission to hear your keys.")
+                    Spacer()
+                    Button("Open Settings") { keySounds.openPermissionSettings() }
+                }
+            }
+            if keySounds.mode != .off {
+                row("Volume") {
+                    Slider(value: $keySounds.volume, in: 0...1)
+                        .frame(width: 150)
+                }
+                row("Pitch") {
+                    Picker("Pitch", selection: $keySounds.pitchVariation) {
+                        ForEach(KeySounds.pitchSteps, id: \.self) { Text($0.formatted()).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                .help("Each keystroke is shifted up or down by up to this many semitones, so repeated keys sound natural.")
+                Text("Quiet in")
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(StoredList.items(quietApps), id: \.self) { id in
+                        appRow(id, list: $quietApps, disabled: $disabledQuietApps)
+                    }
+                    Button("Add App…") {
+                        let ids = StoredList.items(quietApps)
+                        quietApps = StoredList.string(ids + AppBlocker.pickApps(prompt: "Add").filter { !ids.contains($0) })
+                    }
+                    .controlSize(.small)
+                    .padding(.top, 2)
+                }
+            }
+            caption("Switch clicks as you type, in any app. Always silent in password fields.")
+        }
+    }
+
+    @ViewBuilder private var blocking: some View {
+        card {
+            Toggle("Block sites during sessions", isOn: $blockSites)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(StoredList.items(blockedSites), id: \.self) { site in
+                    BlockRow(name: site, isOn: isOn(site, disabled: $disabledSites),
+                             remove: { remove(site, from: $blockedSites, disabled: $disabledSites) }) {
+                        SiteIcon(site: SiteBlocker.normalize(site))
+                    }
+                }
+                HStack(spacing: 6) {
+                    TextField("Add site, e.g. reddit.com", text: $newSite)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        .onSubmit(addSite)
+                    Button("Add", action: addSite)
+                        .disabled(SiteBlocker.normalize(newSite).isEmpty)
+                }
+                .controlSize(.small)
+                .padding(.top, 2)
+            }
+            .disabled(!blockSites)
+            .opacity(blockSites ? 1 : 0.5)
+            caption("Works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser.")
+        }
+
+        card {
+            Toggle("Quit apps during sessions", isOn: $blockApps)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(StoredList.items(blockedApps), id: \.self) { id in
+                    appRow(id, list: $blockedApps, disabled: $disabledApps)
+                }
+                Button("Add App…") {
+                    let ids = StoredList.items(blockedApps)
+                    blockedApps = StoredList.string(ids + AppBlocker.pickApps().filter { !ids.contains($0) })
+                }
+                .controlSize(.small)
+                .padding(.top, 2)
+            }
+            .disabled(!blockApps)
+            .opacity(blockApps ? 1 : 0.5)
+            caption("Zone quits these apps when a session starts, and again if you open them during it.")
+        }
+    }
+
+    /// App list row with its icon, or a placeholder when the app can't be found.
+    private func appRow(_ id: String, list: Binding<String>, disabled: Binding<String>) -> some View {
+        let info = AppBlocker.info(for: id)
+        return BlockRow(name: info?.name ?? id, isOn: isOn(id, disabled: disabled),
+                        remove: { remove(id, from: list, disabled: disabled) }) {
+            if let icon = info?.icon {
+                Image(nsImage: icon).resizable()
+            } else {
+                Image(systemName: "app.dashed").foregroundStyle(palette.muted)
+            }
+        }
     }
 
     private func addSite() {
