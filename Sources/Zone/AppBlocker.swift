@@ -45,12 +45,12 @@ final class AppBlocker {
     }
 
     /// Asks for apps to add; returns their bundle identifiers.
-    static func pickApps() -> [String] {
+    static func pickApps(prompt: String = "Block") -> [String] {
         let panel = NSOpenPanel()
         panel.directoryURL = URL(filePath: "/Applications")
         panel.allowedContentTypes = [.application]
         panel.allowsMultipleSelection = true
-        panel.prompt = "Block"
+        panel.prompt = prompt
         guard panel.runModal() == .OK else { return [] }
         return panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }.filter { $0 != Bundle.main.bundleIdentifier }
     }

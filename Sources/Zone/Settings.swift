@@ -20,6 +20,11 @@ enum Keys {
     static let disabledSites = "disabledSites"
     static let disabledApps = "disabledApps"
     static let keepAwake = "keepAwake"
+    static let keySounds = "keySounds"
+    static let keySoundVolume = "keySoundVolume"
+    static let keySoundPitch = "keySoundPitch"
+    static let quietApps = "quietApps"
+    static let disabledQuietApps = "disabledQuietApps"
 }
 
 /// Settings lists (sites, apps) are stored as one item per line.

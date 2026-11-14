@@ -27,6 +27,8 @@
 - **Focus modulation.** An optional 16 Hz pulse woven into the music, a rhythm linked to sustained attention
   ([Woods et al. 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11499863/)).
 - **Your Mac stays awake** until the session ends.
+- **Keyboard sounds.** Optional mechanical keyboard clicks (NovelKeys Cream switches) as you type, during
+  sessions or all the time, with volume and pitch variation. Silent in password fields and password managers.
 - **Lives in your menu bar** if you like, with the time left always in view:
 
   <img src="docs/menu-bar.png" width="86" alt="Zone in the menu bar showing 24m left">
@@ -55,6 +57,8 @@ Then open Spotlight (⌘ Space), type **Zone**, press Return. That's it, the son
   permission; say no to leave that browser alone.
 - **Site blocking is on by default** for YouTube and Netflix; edit the list or turn it off in Settings. No apps are
   closed until you add some.
+- **Keyboard sounds are off by default.** Turning them on in Settings asks for the Input Monitoring permission once.
+  After rebuilding Zone from source, macOS may need it granted again (Settings shows a button when it does).
 
 ## Build from source
 

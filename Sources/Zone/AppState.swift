@@ -8,6 +8,7 @@ final class AppState {
 
     let timer: SessionTimer
     let music = MusicPlayer()
+    let keySounds = KeySounds()
     @ObservationIgnored private let blocker = SiteBlocker()
     @ObservationIgnored private let appBlocker = AppBlocker()
     @ObservationIgnored private let caffeinator = Caffeinator()
@@ -93,6 +94,7 @@ final class AppState {
         blocker.update(active: timer.phase == .running)
         appBlocker.update(active: timer.phase == .running)
         caffeinator.update(active: timer.phase == .running)
+        keySounds.update(sessionRunning: timer.phase == .running)
     }
 }
 

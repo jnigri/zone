@@ -15,10 +15,13 @@ struct SettingsView: View {
     @AppStorage(Keys.disabledSites) private var disabledSites = ""
     @AppStorage(Keys.disabledApps) private var disabledApps = ""
     @AppStorage(Keys.keepAwake) private var keepAwake = true
+    @AppStorage(Keys.quietApps) private var quietApps = KeySounds.defaultQuietApps
+    @AppStorage(Keys.disabledQuietApps) private var disabledQuietApps = ""
     @State private var newSite = ""
 
     var body: some View {
         @Bindable var music = state.music
+        @Bindable var keySounds = state.keySounds
 
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -54,6 +57,59 @@ struct SettingsView: View {
                 Toggle("Keep Mac awake during sessions", isOn: $keepAwake)
                     .onChange(of: keepAwake) { state.keepAwakeChanged() }
                 caption("The screen stays on and won't lock while a session runs. Pausing lets it sleep again.")
+            }
+
+            card {
+                Text("Keyboard sounds")
+                Picker("Keyboard sounds", selection: $keySounds.mode) {
+                    ForEach(KeySoundMode.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                if keySounds.needsPermission {
+                    HStack(alignment: .firstTextBaseline) {
+                        caption("Zone needs Input Monitoring permission to hear your keys.")
+                        Spacer()
+                        Button("Open Settings") { keySounds.openPermissionSettings() }
+                    }
+                }
+                if keySounds.mode != .off {
+                    row("Volume") {
+                        Slider(value: $keySounds.volume, in: 0...1)
+                            .frame(width: 150)
+                    }
+                    row("Pitch") {
+                        Picker("Pitch", selection: $keySounds.pitchVariation) {
+                            ForEach(KeySounds.pitchSteps, id: \.self) { Text($0.formatted()).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    .help("Each keystroke is shifted up or down by up to this many semitones, so repeated keys sound natural.")
+                    Text("Quiet in")
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(StoredList.items(quietApps), id: \.self) { id in
+                            let info = AppBlocker.info(for: id)
+                            BlockRow(name: info?.name ?? id, isOn: isOn(id, disabled: $disabledQuietApps),
+                                     remove: { remove(id, from: $quietApps, disabled: $disabledQuietApps) }) {
+                                if let icon = info?.icon {
+                                    Image(nsImage: icon).resizable()
+                                } else {
+                                    Image(systemName: "app.dashed").foregroundStyle(palette.muted)
+                                }
+                            }
+                        }
+                        Button("Add App…") {
+                            let ids = StoredList.items(quietApps)
+                            quietApps = StoredList.string(ids + AppBlocker.pickApps(prompt: "Add").filter { !ids.contains($0) })
+                        }
+                        .controlSize(.small)
+                        .padding(.top, 2)
+                    }
+                }
+                caption("Switch clicks as you type, in any app. Always silent in password fields.")
             }
 
             card {
@@ -128,6 +184,7 @@ struct SettingsView: View {
         .toggleStyle(.switch)
         .controlSize(.small)
         .onExitCommand(perform: onBack)
+        .onAppear { state.keySounds.refresh() }
         .onChange(of: theme) { _, mode in mode.apply() }
     }
 
