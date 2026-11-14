@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Zone.app from the Swift package: release binary, Info.plist, icon, ad-hoc signature.
+# Builds Zone.app from the Swift package: release binary, Info.plist, icon, code signature.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,6 +25,14 @@ ICONSET="$(mktemp -d)/AppIcon.iconset"
 "$BIN" --render-icon Resources/Logo.png "$ICONSET"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 
-# Ad-hoc signature: needed for notifications to be delivered.
-codesign --force --sign - "$APP"
+# A signature is needed for notifications to be delivered. A stable identity (a self-signed
+# "Zone Dev" certificate by default) keeps privacy permissions across rebuilds; ad-hoc
+# signing changes the app's identity on every build, so macOS asks for them again.
+IDENTITY="${SIGN_IDENTITY:-Zone Dev}"
+if security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
+    codesign --force --sign "$IDENTITY" "$APP"
+else
+    echo "warning: signing identity '$IDENTITY' not found, signing ad-hoc (permissions reset on each build)" >&2
+    codesign --force --sign - "$APP"
+fi
 echo "Built $APP"
