@@ -7,3 +7,6 @@ Zone.app/
 xcuserdata/
 .vscode/
 .idea/
+
+# Suno prompts used to make the bundled songs, kept local
+docs/suno/
