@@ -33,13 +33,16 @@ enum MusicLibrary {
     }
 
     /// Everything Zone can play: the bundled songs plus the ones in `folder`. A folder song
-    /// with the same file name as a bundled one replaces it (older versions copied the bundled
-    /// songs into the folder).
+    /// with the same mood and file name as a bundled one replaces it.
     static func library(folder: URL) -> [URL] {
         let own = tracks(in: folder)
-        let ownNames = Set(own.map(\.lastPathComponent))
-        return (bundledTracks.filter { !ownNames.contains($0.lastPathComponent) } + own)
+        let ownKeys = Set(own.map(key))
+        return (bundledTracks.filter { !ownKeys.contains(key($0)) } + own)
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    private static func key(_ url: URL) -> String {
+        "\(SongInfo(url).mood.rawValue)/\(url.lastPathComponent)"
     }
 
     static func save(_ url: URL) {
@@ -48,14 +51,41 @@ enum MusicLibrary {
         }
     }
 
+    /// Songs directly in `folder` plus those one level down in its mood folders
+    /// ("Cruise", "Beast Mode").
     static func tracks(in folder: URL) -> [URL] {
-        let contents = (try? FileManager.default.contentsOfDirectory(
-            at: folder,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        )) ?? []
-        return contents
+        let contents = files(in: folder)
+        let moodFolders = contents.filter { Mood(named: $0.lastPathComponent) != nil && isDirectory($0) }
+        return (contents + moodFolders.flatMap { files(in: $0) })
             .filter { audioExtensions.contains($0.pathExtension.lowercased()) }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    private static func files(in folder: URL) -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(
+            at: folder,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+    }
+
+    /// Matched by raw identifier: the .iTunesMetadataGrouping lookup misses it in these files.
+    private static let groupingIdentifiers: Set<String> = ["itsk/%A9grp", "id3/TIT1"]
+
+    /// Comma-separated words in the song's Grouping field (Music app, Get Info), lowercased.
+    static func tags(for url: URL) async -> [String] {
+        guard let items = try? await AVURLAsset(url: url).load(.metadata),
+              let grouping = items.first(where: { groupingIdentifiers.contains($0.identifier?.rawValue ?? "") }),
+              let value = try? await grouping.load(.stringValue)
+        else { return [] }
+        var seen = Set<String>()
+        return value
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    private static func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
 }

@@ -19,8 +19,8 @@
   Play starts both, pause stops both. When time's up, the music fades out and a chime lets you know.
 - **Music included.** Zone comes with original tracks made for focus, from calm rain-window vibes to
   upbeat grooves. Want your own too? Point it at any folder of songs and they play alongside.
-- **Pick the mood.** Boot Up, Cruise, No Excuses, Recharge, Beast Mode, Ultra Focus or Night Owl: choose what you
-  need right now and only those songs play. Narrow it to one genre if you like. Don't like a song? Thumbs-down and
+- **Cruise or Beast Mode.** Zone plays steady Cruise songs by default; flip the switch at the top to Beast Mode
+  when you need full power. Filter by tag with Only or Exclude if you like. Don't like a song? Thumbs-down and
   it never plays again.
 - **Distractions blocked.** During a session, YouTube and Netflix get swapped for a gentle "stay in the zone"
   page, and any apps you pick in Settings are closed.
@@ -49,8 +49,9 @@ Then open Spotlight (⌘ Space), type **Zone**, press Return. That's it, the son
 
 - **Keyboard:** Space plays and pauses, ⌘, opens Settings, Escape goes back.
 - **Menu bar mode** (Settings) hides the Dock icon. Left-click the icon for the panel, right-click to play or pause.
-- **Your own music:** Zone plays m4a, mp3, aac, wav and aiff files. Name a file `mood.genre.title`, for example
-  `ultra_focus.lofi.one_loop.m4a`, to put it under a mood and genre. Files named any other way play under Any Mood.
+- **Your own music:** Zone plays m4a, mp3, aac, wav and aiff files. Put a song in a `Cruise` or `Beast Mode`
+  folder to give it that mood; songs outside them play in Cruise. The file name is the title. Comma-separated
+  words in a song's Grouping field (Music app, Get Info) become tags you can filter by.
   The refresh button in the music picker picks up new songs.
 - **Disliked songs** are listed at the bottom of the music picker, where Restore brings them back.
 - **Site blocking** works in Safari, Chrome, Arc, Brave, Edge and Vivaldi. macOS asks once per browser for

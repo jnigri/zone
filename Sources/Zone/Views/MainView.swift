@@ -20,7 +20,8 @@ struct MainView: View {
                 SettingsView { screen = .session }
                     .frame(height: sessionHeight)
             case .music:
-                MoodView { screen = .session }
+                MusicView { screen = .session }
+                    .frame(height: sessionHeight, alignment: .top)
             case .session:
                 VStack(spacing: 20) {
                     header
@@ -42,8 +43,16 @@ struct MainView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            moodButton
+            MoodSwitch()
             Spacer()
+            IconButton(
+                systemName: "music.note.list",
+                help: state.music.isFiltering ? "Tag filter on. Filter by tag, see disliked songs"
+                    : "Filter by tag, see disliked songs",
+                tint: state.music.isFiltering ? palette.accent : nil
+            ) {
+                screen = .music
+            }
             IconButton(systemName: "gearshape", help: "Settings") {
                 screen = .settings
             }
@@ -54,34 +63,6 @@ struct MainView: View {
                 }
             }
         }
-    }
-
-    /// Shows what is playing ("Ultra Focus · Lofi") and opens the picker.
-    private var moodButton: some View {
-        let music = state.music
-        let title = [music.mood?.title ?? "Any Mood", music.genre?.capitalized]
-            .compactMap(\.self)
-            .joined(separator: " · ")
-        return Button {
-            screen = .music
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: music.mood?.symbol ?? "shuffle")
-                    .foregroundStyle(music.mood == nil ? palette.muted : palette.accent)
-                Text(title)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(palette.muted)
-            }
-            .font(.system(.callout, design: .rounded, weight: .medium))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(palette.panel, in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help("Pick a mood and genre")
     }
 
     @ViewBuilder
@@ -97,7 +78,7 @@ struct MainView: View {
             .font(.callout)
         } else if state.music.current == nil, state.music.playableTracks.isEmpty {
             HStack(spacing: 4) {
-                Text("No songs for this mood yet.")
+                Text("No \(state.music.mood.title) songs here.")
                     .foregroundStyle(palette.muted)
                 Button("Change…") { screen = .music }
                     .buttonStyle(.plain)
@@ -122,6 +103,44 @@ struct MainView: View {
             .font(.callout)
             .foregroundStyle(palette.muted)
         }
+    }
+}
+
+/// Cruise or Beast Mode, side by side in one capsule. The current one shows its name; the
+/// other shows only its icon, so the switch stays narrow.
+private struct MoodSwitch: View {
+    @Environment(AppState.self) private var state
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        let current = state.music.mood
+        HStack(spacing: 2) {
+            ForEach(Mood.allCases) { mood in
+                let selected = mood == current
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { state.music.setMood(mood) }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: mood.symbol)
+                            .foregroundStyle(selected ? palette.accent : palette.muted)
+                        if selected {
+                            Text(mood.title).lineLimit(1)
+                        }
+                    }
+                    .font(.system(.callout, design: .rounded, weight: .medium))
+                    .padding(.horizontal, selected ? 10 : 8)
+                    .padding(.vertical, 4)
+                    .background(selected ? palette.raised : .clear, in: Capsule())
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("\(mood.title): \(mood.subtitle.lowercased())")
+                .accessibilityLabel(mood.title)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(palette.panel, in: Capsule())
     }
 }
 
